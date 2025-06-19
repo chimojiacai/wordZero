@@ -77,3 +77,7 @@ type Break struct {
 	XMLName xml.Name `xml:"w:br"`
 	Type    string   `xml:"w:type,attr,omitempty"`
 }
+
+type PageBreak struct {
+	XMLName xml.Name `xml:"w:pageBreakBefore"`
+}

@@ -108,6 +108,7 @@ type ParagraphProperties struct {
 	Spacing             *Spacing             `xml:"w:spacing,omitempty"`
 	Indentation         *Indentation         `xml:"w:ind,omitempty"`
 	Justification       *Justification       `xml:"w:jc,omitempty"`
+	PageBreak           *PageBreak           `xml:"w:pageBreakBefore,omitempty"`
 }
 
 // ParagraphBorder 段落边框
@@ -150,7 +151,7 @@ type Run struct {
 	Drawing    *DrawingElement `xml:"w:drawing,omitempty"`
 	FieldChar  *FieldChar      `xml:"w:fldChar,omitempty"`
 	InstrText  *InstrText      `xml:"w:instrText,omitempty"`
-	Break      *Break          `xml:"w:br,omitempty"`
+	Break      *Break          `xml:"w:br,omitempty"` // 换行
 }
 
 // RunProperties 文本属性
@@ -2562,13 +2563,6 @@ func (d *Document) parseTableRowProperties(decoder *xml.Decoder) (*TableRowPrope
 	}
 }
 
-// AddPageBreak 添加分页符
-func (p *Paragraph) AddPageBreak() {
-	p.Runs = append(p.Runs, Run{
-		Break: &Break{Type: "page"},
-	})
-}
-
 // AddLineBreak 添加行间符
 func (p *Paragraph) AddLineBreak(text string) {
 	p.Runs = append(p.Runs, Run{
@@ -2582,4 +2576,11 @@ func (p *Paragraph) AddLineBreak(text string) {
 			},
 		})
 	}
+}
+
+func (p *Paragraph) AddPageBreak() {
+	if p.Properties == nil {
+		p.Properties = &ParagraphProperties{}
+	}
+	p.Properties.PageBreak = &PageBreak{}
 }
