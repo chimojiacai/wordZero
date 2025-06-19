@@ -4,6 +4,8 @@ package document
 import (
 	"encoding/xml"
 	"fmt"
+	"strconv"
+	"strings"
 )
 
 // HeaderFooterType 页眉页脚类型
@@ -540,4 +542,118 @@ func (d *Document) addContentType(partName, contentType string) {
 		ContentType: contentType,
 	}
 	d.contentTypes.Overrides = append(d.contentTypes.Overrides, override)
+}
+
+// AddStyleHeader 添加带有样式的页眉
+func (d *Document) AddStyleHeader(headerType HeaderFooterType, text, redText string, format *TextFormat) error {
+	header := createStandardHeader()
+	// 创建运行属性
+	runProps := setFormat(format)
+	// 创建页眉段落
+	paragraph := &Paragraph{}
+	paragraph.SetAlignment(AlignCenter)
+	if text != "" {
+		if strings.Contains(text, "\n") {
+			runs := strings.Split(text, "\n")
+			for i, runText := range runs {
+				run := Run{
+					Properties: runProps,
+					Text: Text{
+						Content: runText,
+						Space:   "preserve",
+					},
+				}
+				paragraph.Runs = append(paragraph.Runs, run)
+				if i == len(runs)-1 {
+					break
+				}
+				paragraph.AddLineBreak("") // 换行
+			}
+
+			if redText != "" {
+				// 设置成红色
+				format.FontColor = "FF0000"
+				paragraph.Runs = append(paragraph.Runs, Run{
+					Properties: setFormat(format),
+					Text: Text{
+						Content: redText,
+						Space:   "preserve",
+					},
+				})
+				paragraph.AddLineBreak("") // 换行
+			}
+		} else {
+			run := Run{
+				Properties: runProps,
+				Text: Text{
+					Content: text,
+					Space:   "preserve",
+				},
+			}
+			paragraph.Runs = append(paragraph.Runs, run)
+		}
+	}
+	header.Paragraphs = append(header.Paragraphs, paragraph)
+
+	// 生成关系ID
+	headerID := fmt.Sprintf("rId%d", len(d.documentRelationships.Relationships)+2) // +2因为rId1保留给styles
+
+	// 序列化页眉
+	headerXML, err := xml.MarshalIndent(header, "", "  ")
+	if err != nil {
+		return fmt.Errorf("序列化页眉失败: %v", err)
+	}
+
+	// 添加XML声明
+	fullXML := append([]byte(xml.Header), headerXML...)
+
+	// 获取文件名
+	fileName := getFileNameForType("header", headerType)
+	headerPartName := fmt.Sprintf("word/%s", fileName)
+
+	// 存储页眉内容
+	d.parts[headerPartName] = fullXML
+
+	// 添加关系到文档关系
+	relationship := Relationship{
+		ID:     headerID,
+		Type:   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header",
+		Target: fileName,
+	}
+	d.documentRelationships.Relationships = append(d.documentRelationships.Relationships, relationship)
+
+	// 添加内容类型
+	d.addContentType(headerPartName, "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml")
+
+	// 更新节属性
+	d.addHeaderReference(headerType, headerID)
+
+	return nil
+}
+
+func setFormat(format *TextFormat) *RunProperties {
+	runProps := &RunProperties{}
+	if format != nil {
+		if format.FontFamily != "" {
+			runProps.FontFamily = &FontFamily{ASCII: format.FontFamily}
+		}
+
+		if format.Bold {
+			runProps.Bold = &Bold{}
+		}
+
+		if format.Italic {
+			runProps.Italic = &Italic{}
+		}
+
+		if format.FontColor != "" {
+			color := strings.TrimPrefix(format.FontColor, "#")
+			runProps.Color = &Color{Val: color}
+		}
+
+		if format.FontSize > 0 {
+			runProps.FontSize = &FontSize{Val: strconv.Itoa(format.FontSize * 2)}
+		}
+	}
+	return runProps
 }

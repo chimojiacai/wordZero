@@ -2568,3 +2568,18 @@ func (p *Paragraph) AddPageBreak() {
 		Break: &Break{Type: "page"},
 	})
 }
+
+// AddLineBreak 添加行间符
+func (p *Paragraph) AddLineBreak(text string) {
+	p.Runs = append(p.Runs, Run{
+		Break: &Break{},
+	})
+	if text != "" {
+		p.Runs = append(p.Runs, Run{
+			Text: Text{
+				Content: text,
+				Space:   "preserve",
+			},
+		})
+	}
+}
