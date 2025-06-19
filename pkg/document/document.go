@@ -150,6 +150,7 @@ type Run struct {
 	Drawing    *DrawingElement `xml:"w:drawing,omitempty"`
 	FieldChar  *FieldChar      `xml:"w:fldChar,omitempty"`
 	InstrText  *InstrText      `xml:"w:instrText,omitempty"`
+	Break      *Break          `xml:"w:br,omitempty"`
 }
 
 // RunProperties 文本属性
@@ -2559,4 +2560,11 @@ func (d *Document) parseTableRowProperties(decoder *xml.Decoder) (*TableRowPrope
 			}
 		}
 	}
+}
+
+// AddPageBreak 添加分页符
+func (p *Paragraph) AddPageBreak() {
+	p.Runs = append(p.Runs, Run{
+		Break: &Break{Type: "page"},
+	})
 }

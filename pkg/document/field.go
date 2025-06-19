@@ -72,3 +72,8 @@ func CreatePageRefField(anchor string) PageRefField {
 		},
 	}
 }
+
+type Break struct {
+	XMLName xml.Name `xml:"w:br"`
+	Type    string   `xml:"w:type,attr,omitempty"`
+}
