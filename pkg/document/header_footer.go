@@ -381,7 +381,7 @@ func (d *Document) AddFooterWithPageNumber(footerType HeaderFooterType, text str
 
 	// 创建页脚段落
 	paragraph := &Paragraph{}
-
+	paragraph.SetAlignment(AlignCenter)
 	if text != "" {
 		run := Run{
 			Text: Text{
