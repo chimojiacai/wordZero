@@ -709,20 +709,20 @@ func (p *Paragraph) SetSpacing(config *SpacingConfig) {
 	if config != nil {
 		spacing := &Spacing{}
 
-		//if config.BeforePara > 0 {
-		// 转换为TWIPs (1/20磅)
-		spacing.Before = strconv.Itoa(config.BeforePara * 20)
-		//}
+		if config.BeforePara > 0 {
+			// 转换为TWIPs (1/20磅)
+			spacing.Before = strconv.Itoa(config.BeforePara * 20)
+		}
 
-		//if config.AfterPara > 0 {
-		// 转换为TWIPs (1/20磅)
-		spacing.After = strconv.Itoa(config.AfterPara * 20)
-		//}
+		if config.AfterPara > 0 {
+			// 转换为TWIPs (1/20磅)
+			spacing.After = strconv.Itoa(config.AfterPara * 20)
+		}
 
-		//if config.LineSpacing > 0 {
-		// 行间距，240表示单倍行距
-		spacing.Line = strconv.Itoa(int(config.LineSpacing * 240))
-		//}
+		if config.LineSpacing > 0 {
+			// 行间距，240表示单倍行距
+			spacing.Line = strconv.Itoa(int(config.LineSpacing * 240))
+		}
 
 		p.Properties.Spacing = spacing
 
