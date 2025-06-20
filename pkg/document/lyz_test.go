@@ -12,6 +12,27 @@ import (
 
 func TestHeaderStyle(t *testing.T) {
 	doc := New()
+	//doc.AddParagraph("").AddPageBreak() // 添加分页
+	//p := doc.AddFormattedParagraph("第二页标题", &TextFormat{
+	//	FontFamily: "SimSun",
+	//	FontSize:   14,
+	//	FontColor:  "000000",
+	//	Bold:       true,
+	//})
+	//p.SetStyle(style.StyleHeading1)
+	//p11 := doc.AddFormattedParagraph("第1页标题", &TextFormat{
+	//	FontFamily: "SimSun",
+	//	FontSize:   12,
+	//	FontColor:  "000000",
+	//	Bold:       true,
+	//})
+	//p11.SetStyle(style.StyleHeading1)
+	p12 := doc.AddHeadingParagraph("文档基础功能", 1)
+	p12.SetSpacing(&SpacingConfig{
+		BeforePara: 0,
+	})
+	//p.AddPageBreak() // 使用段落属性方式分页
+	doc.AddParagraph("第二段…")
 	err := doc.AddStyleHeader(HeaderFooterTypeDefault, "xxx科技有限公司\nRLHB", "2025010", &TextFormat{
 		FontFamily: "SimSun",
 		FontSize:   9,
@@ -27,8 +48,20 @@ func TestHeaderStyle(t *testing.T) {
 		FontColor:  "000000",
 		Bold:       true,
 	}
-	doc.AddFormattedParagraph("2 标准依据", textFormat).SetStyle(style.StyleHeading1)
+	//doc.AddParagraph("").AddPageBreak() // 添加分页
 
+	p := doc.AddFormattedParagraph("第二页标题", &TextFormat{
+		FontFamily: "SimSun",
+		FontSize:   14,
+		FontColor:  "000000",
+		Bold:       true,
+	})
+	p.AddPageBreak()
+	p.SetStyle(style.StyleHeading1)
+	p.SetSpacing(&SpacingConfig{
+		BeforePara: 0,
+		AfterPara:  0,
+	})
 	//textFormat.Bold = false
 	//textFormat.FontSize = 12
 	//// 表格:标准依据
@@ -117,14 +150,16 @@ func TestHeaderStyle(t *testing.T) {
 	//	})
 	//}
 
-	doc.AddParagraph("").AddPageBreak() // 添加分页
+	//doc.AddParagraph("").AddPageBreak() // 添加分页
 
-	doc.AddParagraph("第二页第一行") // 正确位置
-	doc.AddParagraph("第二页第2行") // 正确位置
+	//doc.AddParagraph("第二页第一行") // 正确位置
+	//doc.AddParagraph("第二页第2行")  // 正确位置
 
 	textFormat.Bold = true
 	textFormat.FontSize = 14
-	doc.AddFormattedParagraph("3 企业基本信息", textFormat).SetStyle(style.StyleHeading1)
+	p1 := doc.AddFormattedParagraph("3 企业基本信息", textFormat)
+	p1.SetStyle(style.StyleHeading1)
+	p1.AddPageBreak()
 	textFormat.Bold = false
 	textFormat.FontSize = 12
 	doc.AddFormattedParagraph("我的来急啦圣诞节啦解放啦解放啦是老大解放啦卡随机发", textFormat)
