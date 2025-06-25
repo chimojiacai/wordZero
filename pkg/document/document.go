@@ -109,6 +109,7 @@ type ParagraphProperties struct {
 	Indentation         *Indentation         `xml:"w:ind,omitempty"`
 	Justification       *Justification       `xml:"w:jc,omitempty"`
 	PageBreak           *PageBreak           `xml:"w:pageBreakBefore,omitempty"`
+	SectionProperties   *SectionProperties   `xml:"w:sectPr,omitempty"`
 }
 
 // ParagraphBorder 段落边框

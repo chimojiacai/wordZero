@@ -12,6 +12,17 @@ import (
 
 func TestHeaderStyle(t *testing.T) {
 	doc := New()
+	p3 := doc.AddFormattedParagraph("第1页标题", &TextFormat{
+		FontFamily: "SimSun",
+		FontSize:   14,
+		FontColor:  "000000",
+		Bold:       true,
+	})
+	p3.SetStyle(style.StyleHeading1)
+	p3.SetSpacing(&SpacingConfig{
+		BeforePara: 1,
+		AfterPara:  0,
+	})
 	//doc.AddParagraph("").AddPageBreak() // 添加分页
 	//p := doc.AddFormattedParagraph("第二页标题", &TextFormat{
 	//	FontFamily: "SimSun",
@@ -31,8 +42,9 @@ func TestHeaderStyle(t *testing.T) {
 	p12.SetSpacing(&SpacingConfig{
 		BeforePara: 0,
 	})
-	//p.AddPageBreak() // 使用段落属性方式分页
-	doc.AddParagraph("第二段…")
+	p12.AddPageBreak() // 使用段落属性方式分页
+	p121 := doc.AddParagraph("第二段…")
+	p121.AddSectionBreak("portrait")
 	err := doc.AddStyleHeader(HeaderFooterTypeDefault, "xxx科技有限公司\nRLHB", "2025010", &TextFormat{
 		FontFamily: "SimSun",
 		FontSize:   9,
@@ -62,6 +74,11 @@ func TestHeaderStyle(t *testing.T) {
 		BeforePara: 0,
 		AfterPara:  0,
 	})
+	p.AddSectionBreak("landscape")
+
+	doc.AddFooterWithPageNumber(HeaderFooterTypeDefault, "", true)
+	doc.SetDifferentFirstPage(true)
+
 	//textFormat.Bold = false
 	//textFormat.FontSize = 12
 	//// 表格:标准依据
@@ -160,8 +177,10 @@ func TestHeaderStyle(t *testing.T) {
 	p1 := doc.AddFormattedParagraph("3 企业基本信息", textFormat)
 	p1.SetStyle(style.StyleHeading1)
 	p1.AddPageBreak()
+
 	textFormat.Bold = false
 	textFormat.FontSize = 12
 	doc.AddFormattedParagraph("我的来急啦圣诞节啦解放啦解放啦是老大解放啦卡随机发", textFormat)
+
 	doc.Save("test.docx")
 }
