@@ -1079,3 +1079,38 @@ func (d *Document) SetImageAlignment(imageInfo *ImageInfo, alignment AlignmentTy
 
 	return fmt.Errorf("找不到包含图片ID %s的段落", imageInfo.ID)
 }
+
+// InsertImageRow 将多个图片插入到同一个段落中，实现横向排列
+func (d *Document) InsertImageRow(imageInfos []*ImageInfo, altPrefix string) error {
+	para := &Paragraph{}
+
+	for i, imageInfo := range imageInfos {
+		displayWidth, displayHeight := d.calculateDisplaySize(imageInfo)
+
+		altText := fmt.Sprintf("%s%d", altPrefix, i+1)
+		title := altText
+
+		drawing := d.createInlineImageDrawing(imageInfo, displayWidth, displayHeight, altText, title)
+		run := Run{Drawing: drawing}
+		para.Runs = append(para.Runs, run)
+	}
+	d.Body.AddElement(para)
+	return nil
+}
+
+// InsertImageGrid 将图片按指定列数排布成多行，每行图片使用 InsertImageRow 插入
+func (d *Document) InsertImageGrid(imageInfos []*ImageInfo, cols int, altPrefix string) error {
+	if cols <= 0 {
+		cols = 2 // 默认2列
+	}
+	for i := 0; i < len(imageInfos); i += cols {
+		end := i + cols
+		if end > len(imageInfos) {
+			end = len(imageInfos)
+		}
+		if err := d.InsertImageRow(imageInfos[i:end], altPrefix); err != nil {
+			return err
+		}
+	}
+	return nil
+}

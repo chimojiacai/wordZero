@@ -7,6 +7,7 @@ package document
 
 import (
 	"github.com/ZeroHawkeye/wordZero/pkg/style"
+	"os"
 	"testing"
 )
 
@@ -183,4 +184,42 @@ func TestHeaderStyle(t *testing.T) {
 	doc.AddFormattedParagraph("我的来急啦圣诞节啦解放啦解放啦是老大解放啦卡随机发", textFormat)
 
 	doc.Save("test.docx")
+}
+
+func TestWordZero(t *testing.T) {
+	doc := New()
+	textFormat := &TextFormat{}
+	textFormat.Bold = true
+	textFormat.FontSize = 14
+	content := doc.AddFormattedParagraph("附件11 现场工作照", textFormat)
+	content.AddPageBreak() // 分页
+	content.SetStyle(style.StyleHeading2)
+	content.SetSpacing(&SpacingConfig{
+		BeforePara:  1,
+		LineSpacing: 1.5,
+	})
+	picDirs := []string{"img.png", "img_1.png", "img_2.png", "img_3.png"}
+	imgInfos := make([]*ImageInfo, 0)
+	for _, v := range picDirs {
+		data, _ := os.ReadFile(v)
+		img, err := doc.AddImageFromDataWithoutElement(
+			data,
+			v,              // fileName e.g. "img_1.png"
+			ImageFormatPNG, // or ImageFormatPNG
+			70, 93,         // width/height in pt
+			&ImageConfig{
+				Size:      &ImageSize{Width: 70.4, Height: 93.9},
+				Position:  ImagePositionInline,
+				Alignment: AlignCenter,
+			},
+		)
+		if err != nil {
+			t.Fatalf("图片注册失败: %s", v)
+		}
+		imgInfos = append(imgInfos, img)
+	}
+	if err := doc.InsertImageRow(imgInfos, ""); err != nil {
+		t.Fatalf("插入图片失败: %v", err)
+	}
+	doc.Save("附件11现场工作照.docx")
 }
