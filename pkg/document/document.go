@@ -2585,3 +2585,41 @@ func (p *Paragraph) AddPageBreak() {
 	}
 	p.Properties.PageBreak = &PageBreak{}
 }
+
+// AddRun 追加自定义格式文本
+func (p *Paragraph) AddRun(text string, format *TextFormat, runProps *RunProperties) {
+	// 创建运行属性
+	if format != nil {
+		if format.FontFamily != "" {
+			runProps.FontFamily = &FontFamily{ASCII: format.FontFamily}
+		}
+
+		if format.Bold {
+			runProps.Bold = &Bold{}
+		}
+
+		if format.Italic {
+			runProps.Italic = &Italic{}
+		}
+
+		if format.FontColor != "" {
+			color := strings.TrimPrefix(format.FontColor, "#")
+			runProps.Color = &Color{Val: color}
+		}
+
+		if format.FontSize > 0 {
+			runProps.FontSize = &FontSize{Val: strconv.Itoa(format.FontSize * 2)}
+		}
+	}
+
+	run := Run{
+		Properties: runProps,
+		Text: Text{
+			Content: text,
+			Space:   "preserve",
+		},
+	}
+
+	p.Runs = append(p.Runs, run)
+	Debugf("向段落添加格式化文本: %s", text)
+}
