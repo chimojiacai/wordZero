@@ -15,6 +15,14 @@ import (
 
 func TestHeaderStyle(t *testing.T) {
 	doc := New()
+	doc.SetPageSettings(&PageSettings{
+		MarginTop:    25,
+		MarginRight:  20,
+		MarginBottom: 25,
+		MarginLeft:   20,
+		Orientation:  OrientationPortrait,
+		Size:         PageSizeA4,
+	})
 	p3 := doc.AddFormattedParagraph("第1页标题", &TextFormat{
 		FontFamily: "SimSun",
 		FontSize:   14,
@@ -47,7 +55,7 @@ func TestHeaderStyle(t *testing.T) {
 	})
 	p12.AddPageBreak() // 使用段落属性方式分页
 	p121 := doc.AddParagraph("第二段…")
-	p121.AddSectionBreak("portrait")
+	p121.AddSectionBreak("portrait", doc)
 	err := doc.AddStyleHeader(HeaderFooterTypeDefault, "xxx科技有限公司\nRLHB", "2025010", &TextFormat{
 		FontFamily: "SimSun",
 		FontSize:   9,
@@ -77,7 +85,7 @@ func TestHeaderStyle(t *testing.T) {
 		BeforePara: 0,
 		AfterPara:  0,
 	})
-	p.AddSectionBreak("landscape")
+	p.AddSectionBreak("landscape", doc)
 
 	doc.AddFooterWithPageNumber(HeaderFooterTypeDefault, "", true)
 	doc.SetDifferentFirstPage(true)
