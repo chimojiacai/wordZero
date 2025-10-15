@@ -170,6 +170,7 @@ type RunProperties struct {
 	FontSize   *FontSize   `xml:"w:sz,omitempty"`
 	FontSizeCs *FontSizeCs `xml:"w:szCs,omitempty"`
 	Highlight  *Highlight  `xml:"w:highlight,omitempty"`
+	VertAlign  *VertAlign  `xml:"w:vertAlign,omitempty"` // 下标
 }
 
 // Bold 粗体
@@ -225,6 +226,11 @@ type Color struct {
 type Highlight struct {
 	XMLName xml.Name `xml:"w:highlight"`
 	Val     string   `xml:"w:val,attr"`
+}
+
+type VertAlign struct {
+	XMLName xml.Name `xml:"w:vertAlign"`
+	Val     string   `xml:"w:val,attr"` // subscript 或 superscript
 }
 
 // Text 文本内容

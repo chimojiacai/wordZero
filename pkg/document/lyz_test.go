@@ -7,10 +7,11 @@ package document
 
 import (
 	"fmt"
-	"github.com/ZeroHawkeye/wordZero/pkg/style"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/ZeroHawkeye/wordZero/pkg/style"
 )
 
 func TestHeaderStyle(t *testing.T) {
@@ -255,6 +256,13 @@ func TestHeaderStyle(t *testing.T) {
 			Val: "single",
 		},
 	})
+
+	// 下标测试
+	content = doc.AddFormattedParagraph("x", textFormat)
+	content.AddRun("1", textFormat, &RunProperties{
+		VertAlign: &VertAlign{Val: "subscript"}, // ⬅️ 添加下标
+	})
+
 	doc.Save("test.docx")
 }
 func splitLongTextToLines(text string, maxLen int) []string {
