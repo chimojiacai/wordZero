@@ -262,6 +262,7 @@ func TestHeaderStyle(t *testing.T) {
 	content.AddRun("1", textFormat, &RunProperties{
 		VertAlign: &VertAlign{Val: "subscript"}, // ⬅️ 添加下标
 	})
+	content.AddRun("slss", textFormat, &RunProperties{})
 
 	doc.Save("test.docx")
 }
