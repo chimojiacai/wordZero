@@ -24,14 +24,34 @@ func TestHeaderStyle(t *testing.T) {
 		Size:         PageSizeA4,
 	})
 
-	textFormat := &TextFormat{
-		FontFamily: "SimSun",
-		FontSize:   14,
-		FontColor:  "000000",
-		Bold:       true,
-	}
+	// 首页 - 只创建内容，不设置页眉页脚
+	coverTitle := doc.AddParagraph("文档标题")
+	coverTitle.SetStyle(style.StyleTitle)
+	coverTitle.SetAlignment(AlignCenter)
 
-	// 先设置页眉页脚，确保第一页能显示
+	coverContent := doc.AddParagraph("公司名称")
+	coverContent.SetAlignment(AlignCenter)
+	//coverContent.SetFontSize(14)
+
+	doc.AddParagraph("").AddPageBreak()
+
+	// 目录页 - 只创建内容，不设置页眉页脚
+	tocTitle := doc.AddParagraph("目录")
+	tocTitle.SetStyle(style.StyleHeading1)
+
+	toc1 := doc.AddParagraph("第一章 介绍 ..................... 1")
+	toc1.SetStyle(style.StyleHeading1)
+
+	toc2 := doc.AddParagraph("第二章 内容 ..................... 2")
+	toc2.SetStyle(style.StyleHeading1)
+
+	doc.AddParagraph("").AddPageBreak()
+
+	// 添加分节符，从第三页起启用新的节
+	sectionBreak := doc.AddParagraph("")
+	sectionBreak.AddSectionBreak(OrientationPortrait, doc)
+
+	// 在新节上配置页眉页脚（只影响第三页及之后内容）
 	err := doc.AddStyleHeader(HeaderFooterTypeDefault, "xxx科技有限公司\nRLHB", "2025010", &TextFormat{
 		FontFamily: "SimSun",
 		FontSize:   9,
@@ -41,55 +61,19 @@ func TestHeaderStyle(t *testing.T) {
 		t.Error(err)
 	}
 
-	doc.AddFooterWithPageNumber(HeaderFooterTypeDefault, "", true)
-	//doc.SetDifferentFirstPage(true)
+	if err := doc.AddFooterWithPageNumber(HeaderFooterTypeDefault, "", true); err != nil {
+		t.Error(err)
+	}
 
-	p3 := doc.AddFormattedParagraph("第1页标题", &TextFormat{
+	// 重置页码从1开始
+	doc.RestartPageNumber()
+
+	textFormat := &TextFormat{
 		FontFamily: "SimSun",
 		FontSize:   14,
 		FontColor:  "000000",
 		Bold:       true,
-	})
-	p3.SetStyle(style.StyleHeading1)
-	p3.SetSpacing(&SpacingConfig{
-		BeforePara: 1,
-		AfterPara:  0,
-	})
-	//doc.AddParagraph("").AddPageBreak() // 添加分页
-	//p := doc.AddFormattedParagraph("第二页标题", &TextFormat{
-	//	FontFamily: "SimSun",
-	//	FontSize:   14,
-	//	FontColor:  "000000",
-	//	Bold:       true,
-	//})
-	//p.SetStyle(style.StyleHeading1)
-	//p11 := doc.AddFormattedParagraph("第1页标题", &TextFormat{
-	//	FontFamily: "SimSun",
-	//	FontSize:   12,
-	//	FontColor:  "000000",
-	//	Bold:       true,
-	//})
-	//p11.SetStyle(style.StyleHeading1)
-	p12 := doc.AddHeadingParagraph("文档基础功能", 1)
-	p12.SetSpacing(&SpacingConfig{
-		BeforePara: 0,
-	})
-	p12.AddPageBreak() // 使用段落属性方式分页
-	p121 := doc.AddParagraph("第二段…")
-	p121.AddSectionBreak("portrait", doc)
-
-	// 在添加分节符后重新设置页眉页脚
-	err = doc.AddStyleHeader(HeaderFooterTypeDefault, "xxx科技有限公司\nRLHB", "2025010", &TextFormat{
-		FontFamily: "SimSun",
-		FontSize:   9,
-		FontColor:  "000000",
-	})
-	if err != nil {
-		t.Error(err)
 	}
-	doc.AddFooterWithPageNumber(HeaderFooterTypeDefault, "", true)
-
-	//doc.AddParagraph("").AddPageBreak() // 添加分页
 
 	p := doc.AddFormattedParagraph("第二页标题", &TextFormat{
 		FontFamily: "SimSun",
@@ -104,18 +88,7 @@ func TestHeaderStyle(t *testing.T) {
 		AfterPara:  0,
 	})
 
-	// 在添加横版分节符前再次设置页眉页脚
-	err = doc.AddStyleHeader(HeaderFooterTypeDefault, "xxx科技有限公司\nRLHB", "2025010", &TextFormat{
-		FontFamily: "SimSun",
-		FontSize:   9,
-		FontColor:  "000000",
-	})
-	if err != nil {
-		t.Error(err)
-	}
-	doc.AddFooterWithPageNumber(HeaderFooterTypeDefault, "", true)
-
-	p.AddSectionBreak("landscape", doc)
+	p.AddSectionBreak(OrientationLandscape, doc)
 
 	// 在横版节中再次设置页眉页脚
 	err = doc.AddStyleHeader(HeaderFooterTypeDefault, "xxx科技有限公司\nRLHB", "2025010", &TextFormat{
@@ -126,7 +99,9 @@ func TestHeaderStyle(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	doc.AddFooterWithPageNumber(HeaderFooterTypeDefault, "", true)
+	if err := doc.AddFooterWithPageNumber(HeaderFooterTypeDefault, "", true); err != nil {
+		t.Error(err)
+	}
 
 	textFormat.Bold = false
 	textFormat.FontSize = 12
@@ -140,36 +115,6 @@ func TestHeaderStyle(t *testing.T) {
 	if tableBz == nil {
 		return
 	}
-	//cell, _ := tableBz.GetCell(1, 2)
-	//cell.Properties = &TableCellProperties{
-	//	TableCellW: &TableCellW{
-	//		Type: "dxa",
-	//		W:    "3000",
-	//	},
-	//}
-	//cell, _ := tableBz.GetCell(1, 2)
-	//longText := "2503260079250326007925032600792503260079"
-	//lines := splitLongTextToLines(longText, 10)
-	//
-	//for _, line := range lines {
-	//	if line == "" {
-	//		continue
-	//	}
-	//	para := Paragraph{
-	//		Runs: []Run{
-	//			{
-	//				Text: Text{Content: line},
-	//				Properties: &RunProperties{
-	//					FontFamily: &FontFamily{ASCII: "SimSun", EastAsia: "SimSun"},
-	//					FontSize: &FontSize{
-	//						Val: "24",
-	//					},
-	//				},
-	//			},
-	//		},
-	//	}
-	//	cell.Paragraphs = append(cell.Paragraphs, para)
-	//}
 	_ = tableBz.MergeCellsVertical(1, 7, 0)
 	tableBz.MergeCellsVertical(9, 10, 0)
 	tableBz.MergeCellsVertical(12, 13, 0)
@@ -180,7 +125,6 @@ func TestHeaderStyle(t *testing.T) {
 	tableBz.SetCellText(0, 2, "文件编号")
 	tableBz.SetCellText(1, 0, "生态环境部")
 	tableBz.SetCellText(1, 1, "《石化行业VOCs污染源排查工作指南》")
-	//tableBz.SetCellText(1, 2, insert("2503260079250326007925032600792503260079", 10))
 
 	tableBz.SetCellText(2, 1, "《泄漏和敞开液面排放的挥发性有机物检测技术导则》")
 	tableBz.SetCellText(2, 2, "HJ 733-2014")
@@ -247,11 +191,6 @@ func TestHeaderStyle(t *testing.T) {
 		})
 	}
 
-	//doc.AddParagraph("").AddPageBreak() // 添加分页
-
-	//doc.AddParagraph("第二页第一行") // 正确位置
-	//doc.AddParagraph("第二页第2行")  // 正确位置
-
 	textFormat.Bold = true
 	textFormat.FontSize = 14
 	p1 := doc.AddFormattedParagraph("3 企业基本信息", textFormat)
@@ -267,7 +206,9 @@ func TestHeaderStyle(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	doc.AddFooterWithPageNumber(HeaderFooterTypeDefault, "", true)
+	if err := doc.AddFooterWithPageNumber(HeaderFooterTypeDefault, "", true); err != nil {
+		t.Error(err)
+	}
 
 	textFormat.Bold = false
 	textFormat.FontSize = 12

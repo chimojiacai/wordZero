@@ -237,8 +237,8 @@ func (d *Document) AddHeader(headerType HeaderFooterType, text string) error {
 	// 添加内容类型
 	d.addContentType(headerPartName, "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml")
 
-	// 更新节属性
-	d.addHeaderReference(headerType, headerID)
+	// 更新当前节属性的页眉引用
+	d.addCurrentHeaderReference(headerType, headerID)
 
 	return nil
 }
@@ -290,8 +290,8 @@ func (d *Document) AddFooter(footerType HeaderFooterType, text string) error {
 	// 添加内容类型
 	d.addContentType(footerPartName, "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml")
 
-	// 更新节属性
-	d.addFooterReference(footerType, footerID)
+	// 更新当前节属性的页脚引用
+	d.addCurrentFooterReference(footerType, footerID)
 
 	return nil
 }
@@ -369,8 +369,8 @@ func (d *Document) AddHeaderWithPageNumber(headerType HeaderFooterType, text str
 	// 添加内容类型
 	d.addContentType(headerPartName, "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml")
 
-	// 更新节属性
-	d.addHeaderReference(headerType, headerID)
+	// 更新当前节属性的页眉引用
+	d.addCurrentHeaderReference(headerType, headerID)
 
 	return nil
 }
@@ -448,8 +448,8 @@ func (d *Document) AddFooterWithPageNumber(footerType HeaderFooterType, text str
 	// 添加内容类型
 	d.addContentType(footerPartName, "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml")
 
-	// 更新所有节属性的页脚引用
-	d.addAllFooterReference(footerType, footerID)
+	// 更新当前节属性的页脚引用
+	d.addCurrentFooterReference(footerType, footerID)
 
 	return nil
 }
@@ -537,6 +537,46 @@ func (d *Document) getSectionPropertiesForHeaderFooter() *SectionProperties {
 		},
 	}
 	d.Body.Elements = append(d.Body.Elements, sectPr)
+	return sectPr
+}
+
+// getCurrentSectionProperties 获取当前活动的节属性（用于页眉页脚）
+func (d *Document) getCurrentSectionProperties() *SectionProperties {
+	// 从后往前查找最新的节属性
+	for i := len(d.Body.Elements) - 1; i >= 0; i-- {
+		if para, ok := d.Body.Elements[i].(*Paragraph); ok && para.Properties != nil && para.Properties.SectionProperties != nil {
+			sectPr := para.Properties.SectionProperties
+			// 确保设置了关系命名空间
+			if sectPr.XmlnsR == "" {
+				sectPr.XmlnsR = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+			}
+			return sectPr
+		}
+	}
+
+	// 如果段落中没找到节属性，则返回文档末尾的节属性
+	for _, element := range d.Body.Elements {
+		if sectPr, ok := element.(*SectionProperties); ok {
+			// 确保设置了关系命名空间
+			if sectPr.XmlnsR == "" {
+				sectPr.XmlnsR = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+			}
+			return sectPr
+		}
+	}
+
+	// 如果都没有找到，创建新的节属性
+	sectPr := &SectionProperties{
+		XMLName: xml.Name{Local: "w:sectPr"},
+		XmlnsR:  "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+		PageNumType: &PageNumType{
+			Fmt: "decimal",
+		},
+		Columns: &Columns{
+			Space: "720",
+			Num:   "1",
+		},
+	}
 	return sectPr
 }
 
@@ -638,8 +678,8 @@ func (d *Document) AddStyleHeader(headerType HeaderFooterType, text, redText str
 	// 添加内容类型
 	d.addContentType(headerPartName, "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml")
 
-	// 更新所有节属性的页眉引用
-	d.addAllHeaderReference(headerType, headerID)
+	// 更新当前节属性的页眉引用
+	d.addCurrentHeaderReference(headerType, headerID)
 
 	return nil
 }
@@ -671,78 +711,36 @@ func setFormat(format *TextFormat) *RunProperties {
 	return runProps
 }
 
-// addAllHeaderReference 为所有节属性添加页眉引用
-func (d *Document) addAllHeaderReference(headerType HeaderFooterType, headerID string) {
-	// 更新文档末尾的节属性（如果存在）
-	for _, element := range d.Body.Elements {
-		if sectPr, ok := element.(*SectionProperties); ok {
-			// 确保设置关系命名空间
-			if sectPr.XmlnsR == "" {
-				sectPr.XmlnsR = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
-			}
+// addCurrentHeaderReference 添加页眉引用到当前节属性
+func (d *Document) addCurrentHeaderReference(headerType HeaderFooterType, headerID string) {
+	sectPr := d.getCurrentSectionProperties()
 
-			headerRef := &HeaderFooterReference{
-				Type: string(headerType),
-				ID:   headerID,
-			}
-
-			sectPr.HeaderReferences = append(sectPr.HeaderReferences, headerRef)
-		}
+	// 确保设置关系命名空间
+	if sectPr.XmlnsR == "" {
+		sectPr.XmlnsR = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 	}
 
-	// 更新段落中的节属性
-	for _, element := range d.Body.Elements {
-		if para, ok := element.(*Paragraph); ok && para.Properties != nil && para.Properties.SectionProperties != nil {
-			sectPr := para.Properties.SectionProperties
-			// 确保设置关系命名空间
-			if sectPr.XmlnsR == "" {
-				sectPr.XmlnsR = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
-			}
-
-			headerRef := &HeaderFooterReference{
-				Type: string(headerType),
-				ID:   headerID,
-			}
-
-			sectPr.HeaderReferences = append(sectPr.HeaderReferences, headerRef)
-		}
+	headerRef := &HeaderFooterReference{
+		Type: string(headerType),
+		ID:   headerID,
 	}
+
+	sectPr.HeaderReferences = append(sectPr.HeaderReferences, headerRef)
 }
 
-// addAllFooterReference 为所有节属性添加页脚引用
-func (d *Document) addAllFooterReference(footerType HeaderFooterType, footerID string) {
-	// 更新文档末尾的节属性（如果存在）
-	for _, element := range d.Body.Elements {
-		if sectPr, ok := element.(*SectionProperties); ok {
-			// 确保设置关系命名空间
-			if sectPr.XmlnsR == "" {
-				sectPr.XmlnsR = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
-			}
+// addCurrentFooterReference 添加页脚引用到当前节属性
+func (d *Document) addCurrentFooterReference(footerType HeaderFooterType, footerID string) {
+	sectPr := d.getCurrentSectionProperties()
 
-			footerRef := &FooterReference{
-				Type: string(footerType),
-				ID:   footerID,
-			}
-
-			sectPr.FooterReferences = append(sectPr.FooterReferences, footerRef)
-		}
+	// 确保设置关系命名空间
+	if sectPr.XmlnsR == "" {
+		sectPr.XmlnsR = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 	}
 
-	// 更新段落中的节属性
-	for _, element := range d.Body.Elements {
-		if para, ok := element.(*Paragraph); ok && para.Properties != nil && para.Properties.SectionProperties != nil {
-			sectPr := para.Properties.SectionProperties
-			// 确保设置关系命名空间
-			if sectPr.XmlnsR == "" {
-				sectPr.XmlnsR = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
-			}
-
-			footerRef := &FooterReference{
-				Type: string(footerType),
-				ID:   footerID,
-			}
-
-			sectPr.FooterReferences = append(sectPr.FooterReferences, footerRef)
-		}
+	footerRef := &FooterReference{
+		Type: string(footerType),
+		ID:   footerID,
 	}
+
+	sectPr.FooterReferences = append(sectPr.FooterReferences, footerRef)
 }

@@ -101,6 +101,7 @@ type Columns struct {
 type PageNumType struct {
 	XMLName xml.Name `xml:"w:pgNumType"`
 	Fmt     string   `xml:"w:fmt,attr,omitempty"`
+	Start   string   `xml:"w:start,attr,omitempty"`
 }
 
 // PageSettings 页面设置配置
@@ -472,4 +473,46 @@ func (d *Document) ClearDocGrid() error {
 	sectPr := d.getSectionProperties()
 	sectPr.DocGrid = nil
 	return nil
+}
+
+// SetStartPageNumber 设置起始页码
+func (d *Document) SetStartPageNumber(startPage int) error {
+	sectPr := d.getSectionPropertiesForHeaderFooter()
+	if sectPr.PageNumType == nil {
+		sectPr.PageNumType = &PageNumType{
+			Fmt: "decimal",
+		}
+	}
+	sectPr.PageNumType.Start = strconv.Itoa(startPage)
+	return nil
+}
+
+// ResetPageNumber 重置页码计数，从指定数字开始
+func (d *Document) ResetPageNumber(startNumber int) {
+	sectPr := d.getSectionPropertiesForHeaderFooter()
+	if sectPr.PageNumType == nil {
+		sectPr.PageNumType = &PageNumType{
+			Fmt: "decimal",
+		}
+	}
+	sectPr.PageNumType.Start = strconv.Itoa(startNumber)
+}
+
+// RestartPageNumber 重新开始页码计数（从1开始）
+func (d *Document) RestartPageNumber() {
+	d.ResetPageNumber(1)
+}
+
+// SetHeaderFooterStartPage 设置从第几页开始显示页眉页脚
+// 注意：这个功能需要通过分节符来实现，将不需要页眉页脚的页面放在一个节中，
+// 将需要页眉页脚的页面放在另一个节中
+func (d *Document) SetHeaderFooterStartPage(startPage int) error {
+	// 这个功能比较复杂，需要在指定页数前添加一个不包含页眉页脚的节
+	// 通常通过在文档结构中操作实现，这里提供一个思路：
+	// 1. 在指定页之前的内容后添加分节符
+	// 2. 确保新节之前的节不设置页眉页脚
+	// 3. 新节及之后的节设置页眉页脚
+
+	// 由于这是一个复杂操作，建议用户通过手动添加分节符并控制页眉页脚设置来实现
+	return fmt.Errorf("该功能需要手动通过分节符和页眉页脚设置来实现，请参考文档示例")
 }
