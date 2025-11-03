@@ -448,8 +448,8 @@ func (d *Document) AddFooterWithPageNumber(footerType HeaderFooterType, text str
 	// 添加内容类型
 	d.addContentType(footerPartName, "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml")
 
-	// 更新节属性
-	d.addFooterReference(footerType, footerID)
+	// 更新所有节属性的页脚引用
+	d.addAllFooterReference(footerType, footerID)
 
 	return nil
 }
@@ -501,8 +501,21 @@ func (d *Document) addFooterReference(footerType HeaderFooterType, footerID stri
 // getSectionPropertiesForHeaderFooter 获取或创建带页眉页脚支持的节属性
 func (d *Document) getSectionPropertiesForHeaderFooter() *SectionProperties {
 	// 查找文档中是否已存在节属性
+	// 先从Body.Elements中查找（文档末尾的节属性）
 	for _, element := range d.Body.Elements {
 		if sectPr, ok := element.(*SectionProperties); ok {
+			// 确保设置了关系命名空间
+			if sectPr.XmlnsR == "" {
+				sectPr.XmlnsR = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+			}
+			return sectPr
+		}
+	}
+
+	// 如果Body.Elements中没有找到，则从段落中查找最新的节属性
+	for i := len(d.Body.Elements) - 1; i >= 0; i-- {
+		if para, ok := d.Body.Elements[i].(*Paragraph); ok && para.Properties != nil && para.Properties.SectionProperties != nil {
+			sectPr := para.Properties.SectionProperties
 			// 确保设置了关系命名空间
 			if sectPr.XmlnsR == "" {
 				sectPr.XmlnsR = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
@@ -625,8 +638,8 @@ func (d *Document) AddStyleHeader(headerType HeaderFooterType, text, redText str
 	// 添加内容类型
 	d.addContentType(headerPartName, "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml")
 
-	// 更新节属性
-	d.addHeaderReference(headerType, headerID)
+	// 更新所有节属性的页眉引用
+	d.addAllHeaderReference(headerType, headerID)
 
 	return nil
 }
@@ -656,4 +669,80 @@ func setFormat(format *TextFormat) *RunProperties {
 		}
 	}
 	return runProps
+}
+
+// addAllHeaderReference 为所有节属性添加页眉引用
+func (d *Document) addAllHeaderReference(headerType HeaderFooterType, headerID string) {
+	// 更新文档末尾的节属性（如果存在）
+	for _, element := range d.Body.Elements {
+		if sectPr, ok := element.(*SectionProperties); ok {
+			// 确保设置关系命名空间
+			if sectPr.XmlnsR == "" {
+				sectPr.XmlnsR = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+			}
+
+			headerRef := &HeaderFooterReference{
+				Type: string(headerType),
+				ID:   headerID,
+			}
+
+			sectPr.HeaderReferences = append(sectPr.HeaderReferences, headerRef)
+		}
+	}
+
+	// 更新段落中的节属性
+	for _, element := range d.Body.Elements {
+		if para, ok := element.(*Paragraph); ok && para.Properties != nil && para.Properties.SectionProperties != nil {
+			sectPr := para.Properties.SectionProperties
+			// 确保设置关系命名空间
+			if sectPr.XmlnsR == "" {
+				sectPr.XmlnsR = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+			}
+
+			headerRef := &HeaderFooterReference{
+				Type: string(headerType),
+				ID:   headerID,
+			}
+
+			sectPr.HeaderReferences = append(sectPr.HeaderReferences, headerRef)
+		}
+	}
+}
+
+// addAllFooterReference 为所有节属性添加页脚引用
+func (d *Document) addAllFooterReference(footerType HeaderFooterType, footerID string) {
+	// 更新文档末尾的节属性（如果存在）
+	for _, element := range d.Body.Elements {
+		if sectPr, ok := element.(*SectionProperties); ok {
+			// 确保设置关系命名空间
+			if sectPr.XmlnsR == "" {
+				sectPr.XmlnsR = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+			}
+
+			footerRef := &FooterReference{
+				Type: string(footerType),
+				ID:   footerID,
+			}
+
+			sectPr.FooterReferences = append(sectPr.FooterReferences, footerRef)
+		}
+	}
+
+	// 更新段落中的节属性
+	for _, element := range d.Body.Elements {
+		if para, ok := element.(*Paragraph); ok && para.Properties != nil && para.Properties.SectionProperties != nil {
+			sectPr := para.Properties.SectionProperties
+			// 确保设置关系命名空间
+			if sectPr.XmlnsR == "" {
+				sectPr.XmlnsR = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+			}
+
+			footerRef := &FooterReference{
+				Type: string(footerType),
+				ID:   footerID,
+			}
+
+			sectPr.FooterReferences = append(sectPr.FooterReferences, footerRef)
+		}
+	}
 }

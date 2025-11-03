@@ -16,6 +16,10 @@ func (p *Paragraph) AddSectionBreak(orient PageOrientation, doc *Document) {
 	if p.Properties == nil {
 		p.Properties = &ParagraphProperties{}
 	}
+
+	// 获取现有的节属性（如果有）
+	existingSectPr := doc.getSectionPropertiesForHeaderFooter()
+
 	sectPr := &SectionProperties{
 		XMLName:  xml.Name{Local: "w:sectPr"},
 		PageSize: &PageSizeXML{},
@@ -26,6 +30,12 @@ func (p *Paragraph) AddSectionBreak(orient PageOrientation, doc *Document) {
 			Left:    fmt.Sprintf("%.0f", mmToTwips(doc.GetPageSettings().MarginLeft)),
 			Right:   fmt.Sprintf("%.0f", mmToTwips(doc.GetPageSettings().MarginRight)),
 		},
+		// 继承现有的页眉页脚引用
+		HeaderReferences: existingSectPr.HeaderReferences,
+		FooterReferences: existingSectPr.FooterReferences,
+		TitlePage:        existingSectPr.TitlePage,
+		PageNumType:      existingSectPr.PageNumType,
+		XmlnsR:           existingSectPr.XmlnsR,
 	}
 
 	if orient == OrientationLandscape {
