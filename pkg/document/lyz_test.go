@@ -312,5 +312,25 @@ func TestWordZero(t *testing.T) {
 	if err := doc.InsertImageRow(imgInfos, ""); err != nil {
 		t.Fatalf("插入图片失败: %v", err)
 	}
+
+	// 正确设置最后一页为横向的方法
+	// 我们需要将分节符添加到文档主体的末尾，而不是段落中
+	sectPr := &SectionProperties{
+		PageSize: &PageSizeXML{
+			W:      "16838", // A4 横向宽度
+			H:      "11906", // A4 横向高度
+			Orient: "landscape",
+		},
+		PageMargins: &PageMargin{
+			Top:    fmt.Sprintf("%.0f", mmToTwips(doc.GetPageSettings().MarginTop)),
+			Bottom: fmt.Sprintf("%.0f", mmToTwips(doc.GetPageSettings().MarginBottom)),
+			Left:   fmt.Sprintf("%.0f", mmToTwips(doc.GetPageSettings().MarginLeft)),
+			Right:  fmt.Sprintf("%.0f", mmToTwips(doc.GetPageSettings().MarginRight)),
+		},
+	}
+
+	// 将节属性直接添加到文档主体末尾
+	doc.Body.Elements = append(doc.Body.Elements, sectPr)
+
 	doc.Save("附件11现场工作照.docx")
 }
