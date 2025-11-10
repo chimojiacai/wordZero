@@ -488,14 +488,34 @@ func (d *Document) SetStartPageNumber(startPage int) error {
 }
 
 // ResetPageNumber 重置页码计数，从指定数字开始
+// 优先设置到段落中的SectionProperties（如果存在），否则设置到文档末尾的SectionProperties
 func (d *Document) ResetPageNumber(startNumber int) {
-	sectPr := d.getSectionPropertiesForHeaderFooter()
-	if sectPr.PageNumType == nil {
-		sectPr.PageNumType = &PageNumType{
-			Fmt: "decimal",
+	// 首先尝试查找段落中的SectionProperties（通常是最近添加的分节符）
+	found := false
+	for i := len(d.Body.Elements) - 1; i >= 0; i-- {
+		if para, ok := d.Body.Elements[i].(*Paragraph); ok && para.Properties != nil && para.Properties.SectionProperties != nil {
+			sectPr := para.Properties.SectionProperties
+			if sectPr.PageNumType == nil {
+				sectPr.PageNumType = &PageNumType{
+					Fmt: "decimal",
+				}
+			}
+			sectPr.PageNumType.Start = strconv.Itoa(startNumber)
+			found = true
+			break
 		}
 	}
-	sectPr.PageNumType.Start = strconv.Itoa(startNumber)
+
+	// 如果没有找到段落中的SectionProperties，则设置到文档末尾的SectionProperties
+	if !found {
+		sectPr := d.getSectionPropertiesForHeaderFooter()
+		if sectPr.PageNumType == nil {
+			sectPr.PageNumType = &PageNumType{
+				Fmt: "decimal",
+			}
+		}
+		sectPr.PageNumType.Start = strconv.Itoa(startNumber)
+	}
 }
 
 // RestartPageNumber 重新开始页码计数（从1开始）

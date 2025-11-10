@@ -498,6 +498,37 @@ func (d *Document) addFooterReference(footerType HeaderFooterType, footerID stri
 	sectPr.FooterReferences = append(sectPr.FooterReferences, footerRef)
 }
 
+// clearHeaderFooterReferences 清除所有节属性中的页眉页脚引用
+// 这样分节符之前的内容就不会显示页眉页脚
+func (d *Document) clearHeaderFooterReferences() {
+	// 1. 清除文档末尾的节属性（Body.Elements中的SectionProperties）
+	for _, element := range d.Body.Elements {
+		if sectPr, ok := element.(*SectionProperties); ok {
+			// 清除页眉页脚引用
+			sectPr.HeaderReferences = nil
+			sectPr.FooterReferences = nil
+		}
+	}
+
+	// 2. 清除段落中的节属性（分节符）
+	for _, element := range d.Body.Elements {
+		if para, ok := element.(*Paragraph); ok && para.Properties != nil && para.Properties.SectionProperties != nil {
+			sectPr := para.Properties.SectionProperties
+			// 清除页眉页脚引用
+			sectPr.HeaderReferences = nil
+			sectPr.FooterReferences = nil
+		}
+	}
+
+	// 3. 确保文档末尾的节属性存在且没有页眉页脚引用
+	// 如果不存在，getSectionPropertiesForHeaderFooter会创建一个新的，但我们需要确保它没有页眉页脚引用
+	sectPr := d.getSectionPropertiesForHeaderFooter()
+	if sectPr != nil {
+		sectPr.HeaderReferences = nil
+		sectPr.FooterReferences = nil
+	}
+}
+
 // getSectionPropertiesForHeaderFooter 获取或创建带页眉页脚支持的节属性
 func (d *Document) getSectionPropertiesForHeaderFooter() *SectionProperties {
 	// 查找文档中是否已存在节属性

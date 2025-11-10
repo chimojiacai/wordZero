@@ -4,6 +4,7 @@ package document
 import (
 	"encoding/xml"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -167,23 +168,52 @@ func (d *Document) AddHeadingWithBookmark(text string, level int, bookmarkName s
 // collectHeadings 收集标题信息
 func (d *Document) collectHeadings(maxLevel int) []TOCEntry {
 	var entries []TOCEntry
-	pageNum := 1 // 简化处理，实际需要计算真实页码
+	currentPage := 1
+	paragraphCount := 0
 
 	for _, element := range d.Body.Elements {
+		// 检查是否有分页符或分节符
 		if paragraph, ok := element.(*Paragraph); ok {
+			paragraphCount++
+
+			// 检查是否有分页符
+			if paragraph.Properties != nil && paragraph.Properties.PageBreak != nil {
+				currentPage++
+			}
+
+			// 检查标题级别
 			level := d.getHeadingLevel(paragraph)
 			if level > 0 && level <= maxLevel {
 				text := d.extractParagraphText(paragraph)
 				if text != "" {
+					// 估算页码：考虑分页符和段落数量
+					// 假设每页大约20-30个段落（可以根据实际情况调整）
+					estimatedPage := currentPage
+					if paragraphCount > 0 {
+						// 如果当前页已经有较多段落，可能接近下一页
+						paragraphsPerPage := 25
+						if paragraphCount%paragraphsPerPage > paragraphsPerPage*3/4 {
+							estimatedPage = currentPage + 1
+						}
+					}
+					if estimatedPage < 1 {
+						estimatedPage = 1
+					}
+
 					entry := TOCEntry{
 						Text:       text,
 						Level:      level,
-						PageNum:    pageNum,
+						PageNum:    estimatedPage,
 						BookmarkID: fmt.Sprintf("_Toc_%s", strings.ReplaceAll(text, " ", "_")),
 					}
 					entries = append(entries, entry)
 				}
 			}
+		}
+
+		// 检查分节符（SectionProperties通常表示新节，可能影响页码）
+		if _, ok := element.(*SectionProperties); ok {
+			// 分节符可能重置页码，但这里简化处理
 		}
 	}
 
@@ -533,6 +563,278 @@ func (d *Document) GetHeadingCount() map[int]int {
 // ListHeadings 列出文档中所有的标题，用于调试
 func (d *Document) ListHeadings() []TOCEntry {
 	return d.collectHeadings(9) // 获取所有级别的标题
+}
+
+// GenerateTOCAtPosition 在指定位置生成目录（支持跳过指定索引的元素，如目录占位符）
+// insertIndex: 目录插入位置（会替换该位置的元素）
+// skipIndex: 要跳过的元素索引（如目录占位符段落）
+func (d *Document) GenerateTOCAtPosition(config *TOCConfig, insertIndex, skipIndex int) error {
+	if config == nil {
+		config = DefaultTOCConfig()
+	}
+
+	// 收集标题信息，提取实际的书签名称
+	entries := d.collectHeadingsWithBookmarks(config.MaxLevel, skipIndex)
+
+	if len(entries) == 0 {
+		return fmt.Errorf("未找到标题")
+	}
+
+	// 创建目录SDT
+	tocSDT := d.CreateTOCSDT(config.Title, config.MaxLevel)
+
+	// 为每个标题条目添加到目录中（使用实际的书签ID）
+	for _, entry := range entries {
+		tocSDT.AddTOCEntry(entry.Text, entry.Level, entry.PageNum, entry.BookmarkID)
+	}
+
+	// 完成目录SDT构建
+	tocSDT.FinalizeTOCSDT()
+
+	// 在指定位置插入目录（替换占位符）
+	if insertIndex >= 0 && insertIndex < len(d.Body.Elements) {
+		// 移除占位符
+		newElements := make([]interface{}, 0, len(d.Body.Elements))
+		newElements = append(newElements, d.Body.Elements[:insertIndex]...)
+		// 插入目录
+		newElements = append(newElements, tocSDT)
+		// 添加剩余元素（跳过占位符段落）
+		if insertIndex+1 < len(d.Body.Elements) {
+			newElements = append(newElements, d.Body.Elements[insertIndex+1:]...)
+		}
+		d.Body.Elements = newElements
+	} else {
+		// 如果索引超出范围，直接添加到末尾
+		d.Body.Elements = append(d.Body.Elements, tocSDT)
+	}
+
+	return nil
+}
+
+// collectHeadingsWithBookmarks 收集标题信息，并提取实际的书签名称
+// skipIndex: 要跳过的元素索引（如目录占位符段落）
+func (d *Document) collectHeadingsWithBookmarks(maxLevel int, skipIndex int) []TOCEntry {
+	var entries []TOCEntry
+	physicalPage := 1 // 物理页码（从封面开始）
+	elementIndex := 0
+	currentBookmarkName := "" // 当前标题对应的书签名称
+	hasPassedTOC := false     // 是否已经过了目录页
+
+	// 维护物理页码到显示页码的映射
+	// key: 物理页码, value: 显示页码
+	pageMap := make(map[int]int)
+	pageMap[1] = 0 // 封面页，不显示页码
+	pageMap[2] = 0 // 目录页，不显示页码
+
+	// 当前节的起始页码和起始物理页码
+	currentSectionStartPage := 1     // 当前节的起始显示页码
+	currentSectionStartPhysical := 3 // 当前节的起始物理页码（分节符后的第一页是3）
+
+	// 遍历所有元素，收集标题并提取书签
+	for _, element := range d.Body.Elements {
+		elementIndex++
+
+		// 跳过指定索引的元素（如目录占位符）
+		if elementIndex-1 == skipIndex {
+			// 目录页是物理第2页
+			physicalPage = 2
+			hasPassedTOC = true
+			// 分节符后的第一页是物理页码3
+			currentSectionStartPhysical = 3
+			currentSectionStartPage = 1
+			continue
+		}
+
+		// 检查是否是分节符（SectionProperties）
+		if sectPr, ok := element.(*SectionProperties); ok {
+			// 检测页码重置
+			if sectPr.PageNumType != nil && sectPr.PageNumType.Start != "" {
+				// 解析起始页码
+				if startNum, err := strconv.Atoi(sectPr.PageNumType.Start); err == nil {
+					currentSectionStartPage = startNum
+					currentSectionStartPhysical = physicalPage + 1 // 分节符后的第一页
+				} else {
+					currentSectionStartPage = 1
+					currentSectionStartPhysical = physicalPage + 1
+				}
+			} else {
+				// 如果没有设置起始页码，新节从1开始
+				currentSectionStartPage = 1
+				currentSectionStartPhysical = physicalPage + 1
+			}
+			continue
+		}
+
+		// 检查是否是书签开始标记
+		if bookmarkStart, ok := element.(*BookmarkStart); ok {
+			// 保存当前书签名称，等待后续的标题段落
+			currentBookmarkName = bookmarkStart.Name
+			continue
+		}
+
+		// 检查是否是书签结束标记
+		if _, ok := element.(*BookmarkEnd); ok {
+			// 书签结束，清除当前书签名称
+			currentBookmarkName = ""
+			continue
+		}
+
+		// 检查段落中的分页符和分节符
+		if paragraph, ok := element.(*Paragraph); ok {
+			// 保存分节符之前的currentSectionStartPhysical（用于计算标题页码）
+			sectionStartPhysicalBeforeBreak := currentSectionStartPhysical
+
+			// 先检查是否有分节符（在分页符之前处理）
+			hasSectionBreak := false
+			if paragraph.Properties != nil && paragraph.Properties.SectionProperties != nil {
+				hasSectionBreak = true
+				sectPr := paragraph.Properties.SectionProperties
+				// 检测页码重置
+				if sectPr.PageNumType != nil && sectPr.PageNumType.Start != "" {
+					// 解析起始页码
+					if startNum, err := strconv.Atoi(sectPr.PageNumType.Start); err == nil {
+						currentSectionStartPage = startNum
+					} else {
+						currentSectionStartPage = 1
+					}
+				} else {
+					// 如果没有设置起始页码，新节从1开始
+					currentSectionStartPage = 1
+				}
+				// 分节符后的第一页：如果有分页符，是分页符后的第一页；否则是当前页的下一页
+				if paragraph.Properties.PageBreak != nil {
+					currentSectionStartPhysical = physicalPage + 1 // 分页符后的第一页
+				} else {
+					currentSectionStartPhysical = physicalPage + 1 // 当前页的下一页
+				}
+				// 重要：如果段落有分节符但没有分页符，分节符后的第一页就是新节的开始
+				// 所以应该将physicalPage更新为分节符后的第一页
+				if paragraph.Properties.PageBreak == nil {
+					physicalPage = currentSectionStartPhysical
+				}
+			}
+
+			// 保存标题所在的物理页码（在处理分页符之前，但在处理分节符之后）
+			titlePhysicalPage := physicalPage
+
+			// 记录当前物理页码对应的显示页码（在分页符之前）
+			// 如果已经过了目录页，计算显示页码
+			if hasPassedTOC && physicalPage >= 3 {
+				// 计算显示页码：当前物理页码 - 当前节起始物理页码 + 当前节起始显示页码
+				displayPage := physicalPage - currentSectionStartPhysical + currentSectionStartPage
+				if displayPage < currentSectionStartPage {
+					displayPage = currentSectionStartPage
+				}
+				pageMap[physicalPage] = displayPage
+			}
+
+			// 检查是否有分页符
+			if paragraph.Properties != nil && paragraph.Properties.PageBreak != nil {
+				physicalPage++
+				// 如果分节符在分页符之后，更新分节符后的第一页
+				if hasSectionBreak {
+					currentSectionStartPhysical = physicalPage
+				}
+				// 记录分页符后的物理页码对应的显示页码
+				if hasPassedTOC && physicalPage >= 3 {
+					displayPage := physicalPage - currentSectionStartPhysical + currentSectionStartPage
+					if displayPage < currentSectionStartPage {
+						displayPage = currentSectionStartPage
+					}
+					pageMap[physicalPage] = displayPage
+				}
+			}
+
+			// 检查是否是标题（必须在处理分页符和分节符之后，但使用处理前的物理页码）
+			if paragraph.Properties != nil && paragraph.Properties.ParagraphStyle != nil {
+				styleVal := paragraph.Properties.ParagraphStyle.Val
+				level := 0
+
+				// 根据样式ID判断标题级别
+				switch styleVal {
+				case "Heading1", "1", "2":
+					level = 1
+				case "Heading2", "3":
+					level = 2
+				case "Heading3", "4":
+					level = 3
+				case "Heading4", "5":
+					level = 4
+				case "Heading5", "6":
+					level = 5
+				case "Heading6", "7":
+					level = 6
+				case "Heading7", "8":
+					level = 7
+				case "Heading8", "9":
+					level = 8
+				case "Heading9", "10":
+					level = 9
+				}
+
+				if level > 0 && level <= maxLevel {
+					// 提取标题文本
+					var textBuilder strings.Builder
+					for _, run := range paragraph.Runs {
+						if run.Text.Content != "" {
+							textBuilder.WriteString(run.Text.Content)
+						}
+					}
+					text := textBuilder.String()
+
+					if text != "" {
+						// 如果物理页码小于3（在目录之前），跳过
+						if titlePhysicalPage < 3 {
+							continue
+						}
+
+						// 根据标题所在的物理页码，查找对应的显示页码
+						var estimatedPage int
+						if displayPage, exists := pageMap[titlePhysicalPage]; exists && displayPage > 0 {
+							estimatedPage = displayPage
+						} else {
+							// 如果映射中没有，计算显示页码
+							// 注意：如果段落有分节符，标题在分节符之前，应该使用分节符之前的currentSectionStartPhysical
+							sectionStartPhysical := currentSectionStartPhysical
+							if hasSectionBreak {
+								// 如果段落有分节符，标题在分节符之前，使用分节符之前的currentSectionStartPhysical
+								sectionStartPhysical = sectionStartPhysicalBeforeBreak
+							}
+							estimatedPage = titlePhysicalPage - sectionStartPhysical + currentSectionStartPage
+							if estimatedPage < currentSectionStartPage {
+								estimatedPage = currentSectionStartPage
+							}
+						}
+
+						// 确保页码至少为1
+						if estimatedPage < 1 {
+							estimatedPage = 1
+						}
+
+						// 使用实际的书签名称（如果存在），否则生成默认的书签ID
+						bookmarkID := currentBookmarkName
+						if bookmarkID == "" {
+							// 如果没有找到书签，生成默认的书签ID
+							bookmarkID = fmt.Sprintf("_Toc_%s", strings.ReplaceAll(text, " ", "_"))
+						}
+
+						entry := TOCEntry{
+							Text:       text,
+							Level:      level,
+							PageNum:    estimatedPage, // 初始值，PAGEREF域会自动更新为正确页码
+							BookmarkID: bookmarkID,
+						}
+						entries = append(entries, entry)
+
+						// 清除当前书签名称（已使用）
+						currentBookmarkName = ""
+					}
+				}
+			}
+		}
+	}
+
+	return entries
 }
 
 // createWordFieldTOC 创建使用真正Word域字段的目录

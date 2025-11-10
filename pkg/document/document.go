@@ -49,13 +49,25 @@ func (b *Body) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 	// 分离SectionProperties和其他元素
 	var sectPr *SectionProperties
 	var otherElements []interface{}
+	var hasSectionBreak bool // 标记是否有分节符
 
 	for _, element := range b.Elements {
 		if sp, ok := element.(*SectionProperties); ok {
 			sectPr = sp // 保存最后一个SectionProperties
+		} else if para, ok := element.(*Paragraph); ok && para.Properties != nil && para.Properties.SectionProperties != nil {
+			// 如果段落中有SectionProperties，说明有分节符
+			hasSectionBreak = true
+			otherElements = append(otherElements, element)
 		} else {
 			otherElements = append(otherElements, element)
 		}
+	}
+
+	// 如果有分节符，确保文档末尾的SectionProperties没有页眉页脚引用
+	// 这样分节符之前的内容（封面、目录等）就不会显示页眉页脚
+	if hasSectionBreak && sectPr != nil {
+		sectPr.HeaderReferences = nil
+		sectPr.FooterReferences = nil
 	}
 
 	// 先序列化其他元素（段落、表格等）

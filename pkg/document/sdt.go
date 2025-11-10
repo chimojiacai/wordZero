@@ -168,8 +168,8 @@ func (d *Document) CreateTOCSDT(title string, maxLevel int) *SDT {
 	return sdt
 }
 
-// AddTOCEntry 向目录SDT添加条目
-func (sdt *SDT) AddTOCEntry(text string, level int, pageNum int, entryID string) {
+// AddTOCEntry 向目录SDT添加条目（支持超链接跳转）
+func (sdt *SDT) AddTOCEntry(text string, level int, pageNum int, bookmarkID string) {
 	// 确定目录样式ID (13=toc 1, 14=toc 2, 15=toc 3等)
 	styleVal := fmt.Sprintf("%d", 12+level)
 
@@ -190,47 +190,87 @@ func (sdt *SDT) AddTOCEntry(text string, level int, pageNum int, entryID string)
 		Runs: []Run{},
 	}
 
-	// 创建内嵌的SDT用于占位符文本
-	placeholderSDT := &SDT{
-		Properties: &SDTProperties{
-			RunPr: &RunProperties{
-				FontFamily: &FontFamily{ASCII: "Calibri"},
-				FontSize:   &FontSize{Val: "22"},
-			},
-			ID: &SDTID{Val: entryID},
-			Placeholder: &SDTPlaceholder{
-				DocPart: &DocPart{Val: generatePlaceholderGUID(level)},
-			},
-			Color: &SDTColor{Val: "509DF3"},
+	// 使用超链接域字段来支持跳转
+	// 创建超链接域开始（不设置颜色，使用默认黑色）
+	entryPara.Runs = append(entryPara.Runs, Run{
+		FieldChar: &FieldChar{
+			FieldCharType: "begin",
 		},
-		EndPr: &SDTEndPr{
-			RunPr: &RunProperties{
-				FontFamily: &FontFamily{ASCII: "Calibri"},
-				FontSize:   &FontSize{Val: "22"},
-			},
-		},
-		Content: &SDTContent{
-			Elements: []interface{}{
-				Run{
-					Text: Text{Content: text},
-				},
-			},
-		},
-	}
+	})
 
-	// 将占位符SDT添加到段落中
-	sdt.Content.Elements = append(sdt.Content.Elements, placeholderSDT)
+	// 添加超链接指令
+	entryPara.Runs = append(entryPara.Runs, Run{
+		InstrText: &InstrText{
+			Space:   "preserve",
+			Content: fmt.Sprintf(" HYPERLINK \\l \"%s\" ", bookmarkID),
+		},
+	})
 
-	// 创建包含制表符和页码的文本Run
-	tabRun := Run{
+	// 超链接域分隔符
+	entryPara.Runs = append(entryPara.Runs, Run{
+		FieldChar: &FieldChar{
+			FieldCharType: "separate",
+		},
+	})
+
+	// 添加标题文本（超链接显示文本，使用黑色）
+	entryPara.Runs = append(entryPara.Runs, Run{
+		Properties: &RunProperties{
+			FontFamily: &FontFamily{ASCII: "Calibri", HAnsi: "Calibri", EastAsia: "宋体"},
+			FontSize:   &FontSize{Val: "22"},
+			Color:      &Color{Val: "000000"}, // 黑色
+		},
+		Text: Text{Content: text},
+	})
+
+	// 添加制表符
+	entryPara.Runs = append(entryPara.Runs, Run{
 		Text: Text{Content: "\t"},
-	}
+	})
 
-	pageRun := Run{
-		Text: Text{Content: fmt.Sprintf("%d", pageNum)},
-	}
+	// 添加页码引用域（使用PAGEREF域自动获取页码）
+	entryPara.Runs = append(entryPara.Runs, Run{
+		FieldChar: &FieldChar{
+			FieldCharType: "begin",
+		},
+	})
 
-	entryPara.Runs = append(entryPara.Runs, tabRun, pageRun)
+	entryPara.Runs = append(entryPara.Runs, Run{
+		InstrText: &InstrText{
+			Space:   "preserve",
+			Content: fmt.Sprintf(" PAGEREF %s \\h ", bookmarkID),
+		},
+	})
+
+	entryPara.Runs = append(entryPara.Runs, Run{
+		FieldChar: &FieldChar{
+			FieldCharType: "separate",
+		},
+	})
+
+	// 页码文本（初始值，Word会自动通过PAGEREF域更新为正确页码）
+	// PAGEREF域会自动获取书签所在页的页码，所以初始值不重要
+	entryPara.Runs = append(entryPara.Runs, Run{
+		Properties: &RunProperties{
+			FontFamily: &FontFamily{ASCII: "Calibri", HAnsi: "Calibri", EastAsia: "宋体"},
+			FontSize:   &FontSize{Val: "22"},
+		},
+		Text: Text{Content: fmt.Sprintf("%d", pageNum)}, // 初始值，Word会自动更新为正确页码
+	})
+
+	// 页码域结束
+	entryPara.Runs = append(entryPara.Runs, Run{
+		FieldChar: &FieldChar{
+			FieldCharType: "end",
+		},
+	})
+
+	// 超链接域结束（不设置颜色，使用默认黑色）
+	entryPara.Runs = append(entryPara.Runs, Run{
+		FieldChar: &FieldChar{
+			FieldCharType: "end",
+		},
+	})
 
 	// 添加段落到SDT内容中
 	sdt.Content.Elements = append(sdt.Content.Elements, entryPara)
