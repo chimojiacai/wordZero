@@ -4,7 +4,6 @@ package document
 import (
 	"encoding/xml"
 	"fmt"
-	"strconv"
 	"strings"
 )
 
@@ -128,92 +127,35 @@ func (d *Document) UpdateTOC() error {
 }
 
 // AddHeadingWithBookmark 添加带书签的标题
+// 注意：此函数已废弃，请使用 AddHeadingParagraphWithBookmark
+// 保留此函数仅为了向后兼容
 func (d *Document) AddHeadingWithBookmark(text string, level int, bookmarkName string) *Paragraph {
-	if bookmarkName == "" {
-		bookmarkName = fmt.Sprintf("_Toc_%s", strings.ReplaceAll(text, " ", "_"))
-	}
-
-	// 添加书签开始
-	bookmarkID := fmt.Sprintf("%d", len(d.Body.Elements))
-	bookmark := &BookmarkStart{
-		ID:   bookmarkID,
-		Name: bookmarkName,
-	}
-
-	// 创建标题段落
-	paragraph := d.AddHeadingParagraph(text, level)
-
-	// 在段落的Run中插入书签
-	if len(paragraph.Runs) > 0 {
-		// 在第一个Run前插入书签开始
-		bookmarkRun := Run{
-			Properties: &RunProperties{},
-		}
-		// 这里需要一个特殊的XML序列化处理来插入书签元素
-		paragraph.Runs = append([]Run{bookmarkRun}, paragraph.Runs...)
-	}
-
-	// 添加书签结束
-	bookmarkEnd := &BookmarkEnd{
-		ID: bookmarkID,
-	}
-
-	// 将书签添加到文档中（简化处理）
-	_ = bookmark // 标记已使用
-	d.Body.Elements = append(d.Body.Elements, bookmarkEnd)
-
-	return paragraph
+	// 直接调用新的实现
+	return d.AddHeadingParagraphWithBookmark(text, level, bookmarkName)
 }
 
 // collectHeadings 收集标题信息
+// 注意：此方法用于旧的GenerateTOC实现，页码由PAGEREF字段自动更新
 func (d *Document) collectHeadings(maxLevel int) []TOCEntry {
 	var entries []TOCEntry
-	currentPage := 1
-	paragraphCount := 0
 
 	for _, element := range d.Body.Elements {
-		// 检查是否有分页符或分节符
 		if paragraph, ok := element.(*Paragraph); ok {
-			paragraphCount++
-
-			// 检查是否有分页符
-			if paragraph.Properties != nil && paragraph.Properties.PageBreak != nil {
-				currentPage++
-			}
-
 			// 检查标题级别
 			level := d.getHeadingLevel(paragraph)
 			if level > 0 && level <= maxLevel {
 				text := d.extractParagraphText(paragraph)
 				if text != "" {
-					// 估算页码：考虑分页符和段落数量
-					// 假设每页大约20-30个段落（可以根据实际情况调整）
-					estimatedPage := currentPage
-					if paragraphCount > 0 {
-						// 如果当前页已经有较多段落，可能接近下一页
-						paragraphsPerPage := 25
-						if paragraphCount%paragraphsPerPage > paragraphsPerPage*3/4 {
-							estimatedPage = currentPage + 1
-						}
-					}
-					if estimatedPage < 1 {
-						estimatedPage = 1
-					}
-
+					// 页码完全依赖PAGEREF字段自动更新，这里只提供初始占位值
 					entry := TOCEntry{
 						Text:       text,
 						Level:      level,
-						PageNum:    estimatedPage,
+						PageNum:    1, // 初始占位值，PAGEREF会自动更新为正确页码
 						BookmarkID: fmt.Sprintf("_Toc_%s", strings.ReplaceAll(text, " ", "_")),
 					}
 					entries = append(entries, entry)
 				}
 			}
-		}
-
-		// 检查分节符（SectionProperties通常表示新节，可能影响页码）
-		if _, ok := element.(*SectionProperties); ok {
-			// 分节符可能重置页码，但这里简化处理
 		}
 	}
 
@@ -613,22 +555,23 @@ func (d *Document) GenerateTOCAtPosition(config *TOCConfig, insertIndex, skipInd
 
 // collectHeadingsWithBookmarks 收集标题信息，并提取实际的书签名称
 // skipIndex: 要跳过的元素索引（如目录占位符段落）
+//
+// 重要说明：页码计算
+// ===================
+// Word的页码是基于渲染后的布局动态计算的，包括：
+// - 字体大小和样式
+// - 页边距和行距
+// - 段落间距
+// - 表格自动分页
+// - 图片大小和位置
+// - 内容动态变化（可多可少）
+// 这些因素在XML层面无法准确预测，因此我们完全依赖PAGEREF字段自动更新页码。
+// 代码中的physicalPage跟踪仅用于判断标题是否在目录之后，不用于计算页码。
 func (d *Document) collectHeadingsWithBookmarks(maxLevel int, skipIndex int) []TOCEntry {
 	var entries []TOCEntry
-	physicalPage := 1 // 物理页码（从封面开始）
+	physicalPage := 1 // 物理页码（仅用于判断标题是否在目录之后，不用于计算显示页码）
 	elementIndex := 0
 	currentBookmarkName := "" // 当前标题对应的书签名称
-	hasPassedTOC := false     // 是否已经过了目录页
-
-	// 维护物理页码到显示页码的映射
-	// key: 物理页码, value: 显示页码
-	pageMap := make(map[int]int)
-	pageMap[1] = 0 // 封面页，不显示页码
-	pageMap[2] = 0 // 目录页，不显示页码
-
-	// 当前节的起始页码和起始物理页码
-	currentSectionStartPage := 1     // 当前节的起始显示页码
-	currentSectionStartPhysical := 3 // 当前节的起始物理页码（分节符后的第一页是3）
 
 	// 遍历所有元素，收集标题并提取书签
 	for _, element := range d.Body.Elements {
@@ -638,30 +581,13 @@ func (d *Document) collectHeadingsWithBookmarks(maxLevel int, skipIndex int) []T
 		if elementIndex-1 == skipIndex {
 			// 目录页是物理第2页
 			physicalPage = 2
-			hasPassedTOC = true
-			// 分节符后的第一页是物理页码3
-			currentSectionStartPhysical = 3
-			currentSectionStartPage = 1
 			continue
 		}
 
 		// 检查是否是分节符（SectionProperties）
-		if sectPr, ok := element.(*SectionProperties); ok {
-			// 检测页码重置
-			if sectPr.PageNumType != nil && sectPr.PageNumType.Start != "" {
-				// 解析起始页码
-				if startNum, err := strconv.Atoi(sectPr.PageNumType.Start); err == nil {
-					currentSectionStartPage = startNum
-					currentSectionStartPhysical = physicalPage + 1 // 分节符后的第一页
-				} else {
-					currentSectionStartPage = 1
-					currentSectionStartPhysical = physicalPage + 1
-				}
-			} else {
-				// 如果没有设置起始页码，新节从1开始
-				currentSectionStartPage = 1
-				currentSectionStartPhysical = physicalPage + 1
-			}
+		if _, ok := element.(*SectionProperties); ok {
+			// 分节符后的第一页
+			physicalPage++
 			continue
 		}
 
@@ -681,71 +607,25 @@ func (d *Document) collectHeadingsWithBookmarks(maxLevel int, skipIndex int) []T
 
 		// 检查段落中的分页符和分节符
 		if paragraph, ok := element.(*Paragraph); ok {
-			// 保存分节符之前的currentSectionStartPhysical（用于计算标题页码）
-			sectionStartPhysicalBeforeBreak := currentSectionStartPhysical
-
-			// 先检查是否有分节符（在分页符之前处理）
-			hasSectionBreak := false
-			if paragraph.Properties != nil && paragraph.Properties.SectionProperties != nil {
-				hasSectionBreak = true
-				sectPr := paragraph.Properties.SectionProperties
-				// 检测页码重置
-				if sectPr.PageNumType != nil && sectPr.PageNumType.Start != "" {
-					// 解析起始页码
-					if startNum, err := strconv.Atoi(sectPr.PageNumType.Start); err == nil {
-						currentSectionStartPage = startNum
-					} else {
-						currentSectionStartPage = 1
-					}
-				} else {
-					// 如果没有设置起始页码，新节从1开始
-					currentSectionStartPage = 1
-				}
-				// 分节符后的第一页：如果有分页符，是分页符后的第一页；否则是当前页的下一页
-				if paragraph.Properties.PageBreak != nil {
-					currentSectionStartPhysical = physicalPage + 1 // 分页符后的第一页
-				} else {
-					currentSectionStartPhysical = physicalPage + 1 // 当前页的下一页
-				}
-				// 重要：如果段落有分节符但没有分页符，分节符后的第一页就是新节的开始
-				// 所以应该将physicalPage更新为分节符后的第一页
-				if paragraph.Properties.PageBreak == nil {
-					physicalPage = currentSectionStartPhysical
-				}
-			}
-
-			// 保存标题所在的物理页码（在处理分页符之前，但在处理分节符之后）
+			// 保存标题所在的物理页码（在处理分页符和分节符之前）
 			titlePhysicalPage := physicalPage
-
-			// 记录当前物理页码对应的显示页码（在分页符之前）
-			// 如果已经过了目录页，计算显示页码
-			if hasPassedTOC && physicalPage >= 3 {
-				// 计算显示页码：当前物理页码 - 当前节起始物理页码 + 当前节起始显示页码
-				displayPage := physicalPage - currentSectionStartPhysical + currentSectionStartPage
-				if displayPage < currentSectionStartPage {
-					displayPage = currentSectionStartPage
-				}
-				pageMap[physicalPage] = displayPage
-			}
 
 			// 检查是否有分页符
 			if paragraph.Properties != nil && paragraph.Properties.PageBreak != nil {
 				physicalPage++
-				// 如果分节符在分页符之后，更新分节符后的第一页
-				if hasSectionBreak {
-					currentSectionStartPhysical = physicalPage
-				}
-				// 记录分页符后的物理页码对应的显示页码
-				if hasPassedTOC && physicalPage >= 3 {
-					displayPage := physicalPage - currentSectionStartPhysical + currentSectionStartPage
-					if displayPage < currentSectionStartPage {
-						displayPage = currentSectionStartPage
-					}
-					pageMap[physicalPage] = displayPage
-				}
 			}
 
-			// 检查是否是标题（必须在处理分页符和分节符之后，但使用处理前的物理页码）
+			// 检查是否有分节符
+			if paragraph.Properties != nil && paragraph.Properties.SectionProperties != nil {
+				// 分节符后的第一页
+				if paragraph.Properties.PageBreak == nil {
+					// 如果没有分页符，分节符后的第一页是当前页的下一页
+					physicalPage++
+				}
+				// 如果有分页符，physicalPage已经在上面更新了
+			}
+
+			// 检查是否是标题
 			if paragraph.Properties != nil && paragraph.Properties.ParagraphStyle != nil {
 				styleVal := paragraph.Properties.ParagraphStyle.Val
 				level := 0
@@ -788,28 +668,27 @@ func (d *Document) collectHeadingsWithBookmarks(maxLevel int, skipIndex int) []T
 							continue
 						}
 
-						// 根据标题所在的物理页码，查找对应的显示页码
-						var estimatedPage int
-						if displayPage, exists := pageMap[titlePhysicalPage]; exists && displayPage > 0 {
-							estimatedPage = displayPage
-						} else {
-							// 如果映射中没有，计算显示页码
-							// 注意：如果段落有分节符，标题在分节符之前，应该使用分节符之前的currentSectionStartPhysical
-							sectionStartPhysical := currentSectionStartPhysical
-							if hasSectionBreak {
-								// 如果段落有分节符，标题在分节符之前，使用分节符之前的currentSectionStartPhysical
-								sectionStartPhysical = sectionStartPhysicalBeforeBreak
-							}
-							estimatedPage = titlePhysicalPage - sectionStartPhysical + currentSectionStartPage
-							if estimatedPage < currentSectionStartPage {
-								estimatedPage = currentSectionStartPage
-							}
-						}
+						// ============================================================
+						// 重要：页码完全依赖PAGEREF字段自动更新，不进行手动计算
+						// ============================================================
+						// Word的页码是基于渲染后的布局动态计算的，包括：
+						// - 字体大小和样式
+						// - 页边距和行距
+						// - 段落间距
+						// - 表格自动分页
+						// - 图片大小和位置
+						// - 内容动态变化（可多可少，标题可能被推到下一页或下下页）
+						// 这些因素在XML层面无法准确预测，因此我们完全依赖PAGEREF字段。
+						// PAGEREF字段会在Word打开文档时自动更新为正确的页码。
+						// 如果Word没有自动更新，用户可以：
+						// 1. 按Ctrl+A全选，然后按F9更新所有字段
+						// 2. 或者右键点击目录，选择"更新域"
+						// ============================================================
+						estimatedPage := 1 // 初始占位值，PAGEREF会自动更新为正确页码
 
-						// 确保页码至少为1
-						if estimatedPage < 1 {
-							estimatedPage = 1
-						}
+						// 调试输出
+						Debugf("标题: %s, 书签: %s (页码由PAGEREF字段自动计算)",
+							text, currentBookmarkName)
 
 						// 使用实际的书签名称（如果存在），否则生成默认的书签ID
 						bookmarkID := currentBookmarkName
@@ -1065,7 +944,7 @@ func (d *Document) createTOCEntryWithFields(entry TOCEntry, config *TOCConfig) *
 	para.Runs = append(para.Runs, Run{
 		InstrText: &InstrText{
 			Space:   "preserve",
-			Content: fmt.Sprintf(" PAGEREF %s \\h ", anchor),
+			Content: fmt.Sprintf(" PAGEREF %s ", anchor), // 移除\h开关，因为HYPERLINK已经处理了跳转
 		},
 	})
 
@@ -1115,9 +994,9 @@ func generateUniqueID(text string) int {
 }
 
 // collectHeadingsAndAddBookmarks 收集标题信息并添加书签
+// 注意：页码完全依赖PAGEREF字段自动更新
 func (d *Document) collectHeadingsAndAddBookmarks(maxLevel int) []TOCEntry {
 	var entries []TOCEntry
-	pageNum := 1 // 简化处理，实际需要计算真实页码
 
 	// 需要一个新的Elements切片来插入书签
 	newElements := make([]interface{}, 0, len(d.Body.Elements)*2)
@@ -1135,7 +1014,7 @@ func (d *Document) collectHeadingsAndAddBookmarks(maxLevel int) []TOCEntry {
 					entry := TOCEntry{
 						Text:       text,
 						Level:      level,
-						PageNum:    pageNum,
+						PageNum:    1, // 初始占位值，PAGEREF会自动更新为正确页码
 						BookmarkID: anchor,
 					}
 					entries = append(entries, entry)

@@ -238,7 +238,7 @@ func (sdt *SDT) AddTOCEntry(text string, level int, pageNum int, bookmarkID stri
 	entryPara.Runs = append(entryPara.Runs, Run{
 		InstrText: &InstrText{
 			Space:   "preserve",
-			Content: fmt.Sprintf(" PAGEREF %s \\h ", bookmarkID),
+			Content: fmt.Sprintf(" PAGEREF %s ", bookmarkID), // 移除\h开关，因为HYPERLINK已经处理了跳转
 		},
 	})
 

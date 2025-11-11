@@ -62,7 +62,7 @@ func CreatePageRefField(anchor string) PageRefField {
 		},
 		InstrText: InstrText{
 			Space:   "preserve",
-			Content: fmt.Sprintf(" PAGEREF %s \\h ", anchor),
+			Content: fmt.Sprintf(" PAGEREF %s ", anchor), // 移除\h开关，因为HYPERLINK已经处理了跳转
 		},
 		SeparateChar: FieldChar{
 			FieldCharType: "separate",

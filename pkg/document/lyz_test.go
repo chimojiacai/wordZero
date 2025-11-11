@@ -90,13 +90,32 @@ func TestHeaderStyle(t *testing.T) {
 		p.Runs[0].Properties.Color = &Color{Val: "000000"}
 		p.Runs[0].Properties.Bold = &Bold{}
 	}
-	p.AddPageBreak()
-	p.SetSpacing(&SpacingConfig{
+
+	// 在标题后添加一些内容，确保页面有内容
+	contentPara := doc.AddParagraph("这是第二页标题页面的内容。")
+	if len(contentPara.Runs) > 0 {
+		if contentPara.Runs[0].Properties == nil {
+			contentPara.Runs[0].Properties = &RunProperties{}
+		}
+		contentPara.Runs[0].Properties.FontFamily = &FontFamily{ASCII: "SimSun", HAnsi: "SimSun", EastAsia: "SimSun"}
+		contentPara.Runs[0].Properties.FontSize = &FontSize{Val: "24"} // 12磅 * 2
+		contentPara.Runs[0].Properties.Color = &Color{Val: "000000"}
+	}
+
+	// 在内容段落后添加分页符和分节符
+	contentPara.AddPageBreak()
+	contentPara.SetSpacing(&SpacingConfig{
 		BeforePara: 0,
 		AfterPara:  0,
 	})
 
-	p.AddSectionBreak(OrientationLandscape, doc)
+	contentPara.AddSectionBreak(OrientationLandscape, doc)
+
+	// 标题段落也需要设置间距
+	p.SetSpacing(&SpacingConfig{
+		BeforePara: 0,
+		AfterPara:  0,
+	})
 
 	// 在横版节中再次设置页眉页脚
 	err = doc.AddStyleHeader(HeaderFooterTypeDefault, "xxx科技有限公司\nRLHB", "2025010", &TextFormat{
@@ -218,17 +237,17 @@ func TestHeaderStyle(t *testing.T) {
 	p1.AddPageBreak()
 
 	// 在新节中设置页眉页脚
-	err = doc.AddStyleHeader(HeaderFooterTypeDefault, "xxx科技有限公司\nRLHB", "2025010", &TextFormat{
-		FontFamily: "SimSun",
-		FontSize:   9,
-		FontColor:  "000000",
-	})
-	if err != nil {
-		t.Error(err)
-	}
-	if err := doc.AddFooterWithPageNumber(HeaderFooterTypeDefault, "", true); err != nil {
-		t.Error(err)
-	}
+	//err = doc.AddStyleHeader(HeaderFooterTypeDefault, "xxx科技有限公司\nRLHB", "2025010", &TextFormat{
+	//	FontFamily: "SimSun",
+	//	FontSize:   9,
+	//	FontColor:  "000000",
+	//})
+	//if err != nil {
+	//	t.Error(err)
+	//}
+	//if err := doc.AddFooterWithPageNumber(HeaderFooterTypeDefault, "", true); err != nil {
+	//	t.Error(err)
+	//}
 
 	textFormat.Bold = false
 	textFormat.FontSize = 12
@@ -288,7 +307,19 @@ func TestHeaderStyle(t *testing.T) {
 		t.Error(err)
 	}
 
-	doc.Save("test.docx")
+	//doc.UpdateTOC()
+
+	// 保存文档
+	outputPath := "test.docx"
+	if err := doc.Save(outputPath); err != nil {
+		t.Error(err)
+		return
+	}
+
+	// 注意：目录页码使用PAGEREF字段，初始值为占位符1
+	// 打开Word文档后，按Ctrl+A全选，然后按F9更新所有字段，即可更新目录页码
+	t.Logf("文档已保存: %s", outputPath)
+	t.Logf("提示：打开Word文档后，按Ctrl+A全选，然后按F9更新所有字段，即可更新目录页码")
 }
 
 func reportExplain(doc *Document, textFormat *TextFormat, spacingConfig *SpacingConfig) {
