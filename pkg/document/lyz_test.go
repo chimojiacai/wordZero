@@ -51,16 +51,15 @@ func TestHeaderStyle(t *testing.T) {
 	tocInsertIndex := len(doc.Body.Elements) - 1
 
 	//doc.AddParagraph("").AddPageBreak()
+	// 目录之后，应该是第1页
+	shuban(doc, textFormat)
 
-	// 添加分节符，从第三页起启用新的节
+	// 添加分节符，从这里开始启用新的节
 	sectionBreak := doc.AddParagraph("")
 	sectionBreak.AddSectionBreak(OrientationPortrait, doc)
 
-	// 重置页码从1开始（在设置页眉页脚之前）
-	doc.RestartPageNumber()
-
-	// 在新节上配置页眉页脚（只影响第三页及之后内容）
-	// 注意：在RestartPageNumber之后设置页眉页脚
+	// 在新节上配置页眉页脚（只影响新节及之后内容）
+	// 注意：必须在分节符之后设置页眉页脚
 	err := doc.AddStyleHeader(HeaderFooterTypeDefault, "xxx科技有限公司\nRLHB", "2025010", &TextFormat{
 		FontFamily: "SimSun",
 		FontSize:   9,
@@ -73,8 +72,8 @@ func TestHeaderStyle(t *testing.T) {
 	if err := doc.AddFooterWithPageNumber(HeaderFooterTypeDefault, "", true); err != nil {
 		t.Error(err)
 	}
-
-	//doc.SetDifferentFirstPage(true)
+	// 重置页码从1开始（在设置页眉页脚之后）
+	//doc.RestartPageNumber()
 
 	// 使用 AddHeadingParagraphWithBookmark 创建标题，这样可以被目录生成功能识别并支持跳转
 	bookmarkName1 := "_Toc_第二页标题"
@@ -117,7 +116,8 @@ func TestHeaderStyle(t *testing.T) {
 		AfterPara:  0,
 	})
 
-	// 在横版节中再次设置页眉页脚
+	// 在横版节中再次设置页眉页脚（可选，如果需要不同页眉页脚）
+	// 注意：如果要保持页码连续，不要再次调用RestartPageNumber()
 	err = doc.AddStyleHeader(HeaderFooterTypeDefault, "xxx科技有限公司\nRLHB", "2025010", &TextFormat{
 		FontFamily: "SimSun",
 		FontSize:   9,
@@ -129,6 +129,7 @@ func TestHeaderStyle(t *testing.T) {
 	if err := doc.AddFooterWithPageNumber(HeaderFooterTypeDefault, "", true); err != nil {
 		t.Error(err)
 	}
+	// 不要在这里再次重置页码，保持页码连续
 
 	textFormat.Bold = false
 	textFormat.FontSize = 12
@@ -221,6 +222,39 @@ func TestHeaderStyle(t *testing.T) {
 	// 使用 AddHeadingParagraphWithBookmark 创建标题，这样可以被目录生成功能识别并支持跳转
 	textFormat.Bold = true
 	textFormat.FontSize = 14
+	shuban(doc, textFormat)
+
+	// 在目录页位置生成目录
+	tocConfig := &TOCConfig{
+		Title:        "目录",
+		MaxLevel:     3,
+		ShowPageNum:  true,
+		RightAlign:   true,
+		UseHyperlink: true,
+		DotLeader:    true,
+	}
+
+	// 调用toc.go中的方法生成目录
+	if err := doc.GenerateTOCAtPosition(tocConfig, tocInsertIndex, tocInsertIndex); err != nil {
+		t.Error(err)
+	}
+
+	//doc.UpdateTOC()
+
+	// 保存文档
+	outputPath := "test.docx"
+	if err := doc.Save(outputPath); err != nil {
+		t.Error(err)
+		return
+	}
+
+	// 注意：目录页码使用PAGEREF字段，初始值为占位符1
+	// 打开Word文档后，按Ctrl+A全选，然后按F9更新所有字段，即可更新目录页码
+	t.Logf("文档已保存: %s", outputPath)
+	t.Logf("提示：打开Word文档后，按Ctrl+A全选，然后按F9更新所有字段，即可更新目录页码")
+}
+
+func shuban(doc *Document, textFormat *TextFormat) {
 	bookmarkName2 := "_Toc_3_企业基本信息"
 	p1 := doc.AddHeadingParagraphWithBookmark("3 企业基本信息", 1, bookmarkName2)
 	// 如果需要自定义格式，可以更新Run的属性
@@ -236,18 +270,9 @@ func TestHeaderStyle(t *testing.T) {
 	}
 	p1.AddPageBreak()
 
-	// 在新节中设置页眉页脚
-	//err = doc.AddStyleHeader(HeaderFooterTypeDefault, "xxx科技有限公司\nRLHB", "2025010", &TextFormat{
-	//	FontFamily: "SimSun",
-	//	FontSize:   9,
-	//	FontColor:  "000000",
-	//})
-	//if err != nil {
-	//	t.Error(err)
-	//}
-	//if err := doc.AddFooterWithPageNumber(HeaderFooterTypeDefault, "", true); err != nil {
-	//	t.Error(err)
-	//}
+	// 如果需要在此节中设置页眉页脚（保持与之前相同的页眉页脚）
+	// 由于前面已经设置了页眉页脚，这里无需重复设置
+	// 但需要确保当前节的页码继续增加
 
 	textFormat.Bold = false
 	textFormat.FontSize = 12
@@ -291,35 +316,6 @@ func TestHeaderStyle(t *testing.T) {
 		VertAlign: &VertAlign{Val: "subscript"}, // ⬅️ 添加下标
 	})
 	content.AddRun("slss", textFormat, &RunProperties{})
-
-	// 在目录页位置生成目录
-	tocConfig := &TOCConfig{
-		Title:        "目录",
-		MaxLevel:     3,
-		ShowPageNum:  true,
-		RightAlign:   true,
-		UseHyperlink: true,
-		DotLeader:    true,
-	}
-
-	// 调用toc.go中的方法生成目录
-	if err := doc.GenerateTOCAtPosition(tocConfig, tocInsertIndex, tocInsertIndex); err != nil {
-		t.Error(err)
-	}
-
-	//doc.UpdateTOC()
-
-	// 保存文档
-	outputPath := "test.docx"
-	if err := doc.Save(outputPath); err != nil {
-		t.Error(err)
-		return
-	}
-
-	// 注意：目录页码使用PAGEREF字段，初始值为占位符1
-	// 打开Word文档后，按Ctrl+A全选，然后按F9更新所有字段，即可更新目录页码
-	t.Logf("文档已保存: %s", outputPath)
-	t.Logf("提示：打开Word文档后，按Ctrl+A全选，然后按F9更新所有字段，即可更新目录页码")
 }
 
 func reportExplain(doc *Document, textFormat *TextFormat, spacingConfig *SpacingConfig) {
