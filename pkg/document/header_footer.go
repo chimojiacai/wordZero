@@ -166,6 +166,7 @@ func createPageNumberRuns() []Run {
 		{
 			Text: Text{
 				Content: "1",
+				Space:   "preserve",
 			},
 		},
 		{
