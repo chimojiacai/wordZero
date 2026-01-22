@@ -131,7 +131,7 @@ func (d *Document) CreateTOCSDT(title string, maxLevel int) *SDT {
 		},
 	}
 
-	// 添加目录标题段落
+	// 添加目录标题段落 - 三号（16磅），加粗，居中，宋体
 	titlePara := &Paragraph{
 		Properties: &ParagraphProperties{
 			Spacing: &Spacing{
@@ -150,8 +150,9 @@ func (d *Document) CreateTOCSDT(title string, maxLevel int) *SDT {
 			{
 				Text: Text{Content: title},
 				Properties: &RunProperties{
-					FontFamily: &FontFamily{ASCII: "宋体"},
-					FontSize:   &FontSize{Val: "21"},
+					FontFamily: &FontFamily{ASCII: "宋体", HAnsi: "宋体", EastAsia: "宋体"},
+					FontSize:   &FontSize{Val: "32"}, // 三号（16磅 * 2 = 32）
+					Bold:       &Bold{},
 				},
 			},
 		},
@@ -214,10 +215,16 @@ func (sdt *SDT) AddTOCEntry(text string, level int, pageNum int, bookmarkID stri
 	})
 
 	// 添加标题文本（超链接显示文本，使用黑色）
+	// 根据标题级别设置字体大小：一级标题四号（14磅），二三级标题小四（12磅）
+	fontSize := "24" // 默认小四（12磅 * 2 = 24）
+	if level == 1 {
+		fontSize = "28" // 四号（14磅 * 2 = 28）
+	}
+	
 	entryPara.Runs = append(entryPara.Runs, Run{
 		Properties: &RunProperties{
-			FontFamily: &FontFamily{ASCII: "Calibri", HAnsi: "Calibri", EastAsia: "宋体"},
-			FontSize:   &FontSize{Val: "22"},
+			FontFamily: &FontFamily{ASCII: "宋体", HAnsi: "宋体", EastAsia: "宋体"},
+			FontSize:   &FontSize{Val: fontSize},
 			Color:      &Color{Val: "000000"}, // 黑色
 		},
 		Text: Text{Content: text},
@@ -250,10 +257,11 @@ func (sdt *SDT) AddTOCEntry(text string, level int, pageNum int, bookmarkID stri
 
 	// 页码文本（初始值，Word会自动通过PAGEREF域更新为正确页码）
 	// PAGEREF域会自动获取书签所在页的页码，所以初始值不重要
+	// 页码使用小四（12磅）
 	entryPara.Runs = append(entryPara.Runs, Run{
 		Properties: &RunProperties{
-			FontFamily: &FontFamily{ASCII: "Calibri", HAnsi: "Calibri", EastAsia: "宋体"},
-			FontSize:   &FontSize{Val: "22"},
+			FontFamily: &FontFamily{ASCII: "宋体", HAnsi: "宋体", EastAsia: "宋体"},
+			FontSize:   &FontSize{Val: "24"}, // 小四（12磅 * 2 = 24）
 		},
 		Text: Text{Content: fmt.Sprintf("%d", pageNum)}, // 初始值，Word会自动更新为正确页码
 	})

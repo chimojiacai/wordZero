@@ -109,22 +109,64 @@ func TestHeaderStyleFixed(t *testing.T) {
 		t.Error(err)
 	}
 	// 使用 AddHeadingParagraphWithBookmark 创建标题，这样可以被目录生成功能识别并支持跳转
+	// 一级标题：四号（14磅），宋体，加粗
 	bookmarkName5 := "_Toc_第五页标题"
 	p := doc.AddHeadingParagraphWithBookmark("第五页标题", 1, bookmarkName5)
-	// 如果需要自定义格式，可以更新Run的属性
 	if len(p.Runs) > 0 {
 		if p.Runs[0].Properties == nil {
 			p.Runs[0].Properties = &RunProperties{}
 		}
-		// 设置字体格式
+		// 设置字体格式：四号（14磅 * 2 = 28）
 		p.Runs[0].Properties.FontFamily = &FontFamily{ASCII: "SimSun", HAnsi: "SimSun", EastAsia: "SimSun"}
-		p.Runs[0].Properties.FontSize = &FontSize{Val: "28"} // 14磅 * 2
+		p.Runs[0].Properties.FontSize = &FontSize{Val: "28"}
 		p.Runs[0].Properties.Color = &Color{Val: "000000"}
 		p.Runs[0].Properties.Bold = &Bold{}
 	}
 	
+	// 添加二级标题：小四（12磅），宋体，加粗
+	bookmarkName5_1 := "_Toc_第五页二级标题1"
+	p5_1 := doc.AddHeadingParagraphWithBookmark("第五页二级标题1", 2, bookmarkName5_1)
+	if len(p5_1.Runs) > 0 {
+		if p5_1.Runs[0].Properties == nil {
+			p5_1.Runs[0].Properties = &RunProperties{}
+		}
+		// 设置字体格式：小四（12磅 * 2 = 24）
+		p5_1.Runs[0].Properties.FontFamily = &FontFamily{ASCII: "SimSun", HAnsi: "SimSun", EastAsia: "SimSun"}
+		p5_1.Runs[0].Properties.FontSize = &FontSize{Val: "24"}
+		p5_1.Runs[0].Properties.Color = &Color{Val: "000000"}
+		p5_1.Runs[0].Properties.Bold = &Bold{}
+	}
+	
+	// 添加三级标题：小四（12磅），宋体，加粗
+	bookmarkName5_1_1 := "_Toc_第五页三级标题1"
+	p5_1_1 := doc.AddHeadingParagraphWithBookmark("第五页三级标题1", 3, bookmarkName5_1_1)
+	if len(p5_1_1.Runs) > 0 {
+		if p5_1_1.Runs[0].Properties == nil {
+			p5_1_1.Runs[0].Properties = &RunProperties{}
+		}
+		// 设置字体格式：小四（12磅 * 2 = 24）
+		p5_1_1.Runs[0].Properties.FontFamily = &FontFamily{ASCII: "SimSun", HAnsi: "SimSun", EastAsia: "SimSun"}
+		p5_1_1.Runs[0].Properties.FontSize = &FontSize{Val: "24"}
+		p5_1_1.Runs[0].Properties.Color = &Color{Val: "000000"}
+		p5_1_1.Runs[0].Properties.Bold = &Bold{}
+	}
+	
+	// 添加另一个二级标题：小四（12磅），宋体，加粗
+	bookmarkName5_2 := "_Toc_第五页二级标题2"
+	p5_2 := doc.AddHeadingParagraphWithBookmark("第五页二级标题2", 2, bookmarkName5_2)
+	if len(p5_2.Runs) > 0 {
+		if p5_2.Runs[0].Properties == nil {
+			p5_2.Runs[0].Properties = &RunProperties{}
+		}
+		// 设置字体格式：小四（12磅 * 2 = 24）
+		p5_2.Runs[0].Properties.FontFamily = &FontFamily{ASCII: "SimSun", HAnsi: "SimSun", EastAsia: "SimSun"}
+		p5_2.Runs[0].Properties.FontSize = &FontSize{Val: "24"}
+		p5_2.Runs[0].Properties.Color = &Color{Val: "000000"}
+		p5_2.Runs[0].Properties.Bold = &Bold{}
+	}
+	
 	// 在标题后添加一些内容，确保页面有内容
-	contentPara := doc.AddParagraph("这是第五页标题页面的内容")
+	contentPara := doc.AddParagraph("这是第五页标题页面的内容，包含二级标题和三级标题的测试。")
 	if len(contentPara.Runs) > 0 {
 		if contentPara.Runs[0].Properties == nil {
 			contentPara.Runs[0].Properties = &RunProperties{}
@@ -250,6 +292,88 @@ func TestHeaderStyleFixed(t *testing.T) {
 	sectionBreak3 := doc.AddParagraph("")
 	sectionBreak3.AddSectionBreakWithStartPage(OrientationPortrait, doc, 0, true)
 	
+	// 添加更多标题用于测试目录显示
+	// 一级标题：四号（14磅），宋体，加粗
+	bookmarkName6 := "_Toc_第七页标题"
+	p6 := doc.AddHeadingParagraphWithBookmark("第七页标题", 1, bookmarkName6)
+	if len(p6.Runs) > 0 {
+		if p6.Runs[0].Properties == nil {
+			p6.Runs[0].Properties = &RunProperties{}
+		}
+		// 设置字体格式：四号（14磅 * 2 = 28）
+		p6.Runs[0].Properties.FontFamily = &FontFamily{ASCII: "SimSun", HAnsi: "SimSun", EastAsia: "SimSun"}
+		p6.Runs[0].Properties.FontSize = &FontSize{Val: "28"}
+		p6.Runs[0].Properties.Color = &Color{Val: "000000"}
+		p6.Runs[0].Properties.Bold = &Bold{}
+	}
+	
+	// 添加二级标题：小四（12磅），宋体，加粗
+	bookmarkName6_1 := "_Toc_第七页二级标题1"
+	p6_1 := doc.AddHeadingParagraphWithBookmark("第七页二级标题1", 2, bookmarkName6_1)
+	if len(p6_1.Runs) > 0 {
+		if p6_1.Runs[0].Properties == nil {
+			p6_1.Runs[0].Properties = &RunProperties{}
+		}
+		// 设置字体格式：小四（12磅 * 2 = 24）
+		p6_1.Runs[0].Properties.FontFamily = &FontFamily{ASCII: "SimSun", HAnsi: "SimSun", EastAsia: "SimSun"}
+		p6_1.Runs[0].Properties.FontSize = &FontSize{Val: "24"}
+		p6_1.Runs[0].Properties.Color = &Color{Val: "000000"}
+		p6_1.Runs[0].Properties.Bold = &Bold{}
+	}
+	
+	// 添加三级标题：小四（12磅），宋体，加粗
+	bookmarkName6_1_1 := "_Toc_第七页三级标题1"
+	p6_1_1 := doc.AddHeadingParagraphWithBookmark("第七页三级标题1", 3, bookmarkName6_1_1)
+	if len(p6_1_1.Runs) > 0 {
+		if p6_1_1.Runs[0].Properties == nil {
+			p6_1_1.Runs[0].Properties = &RunProperties{}
+		}
+		// 设置字体格式：小四（12磅 * 2 = 24）
+		p6_1_1.Runs[0].Properties.FontFamily = &FontFamily{ASCII: "SimSun", HAnsi: "SimSun", EastAsia: "SimSun"}
+		p6_1_1.Runs[0].Properties.FontSize = &FontSize{Val: "24"}
+		p6_1_1.Runs[0].Properties.Color = &Color{Val: "000000"}
+		p6_1_1.Runs[0].Properties.Bold = &Bold{}
+	}
+	
+	// 添加另一个三级标题：小四（12磅），宋体，加粗
+	bookmarkName6_1_2 := "_Toc_第七页三级标题2"
+	p6_1_2 := doc.AddHeadingParagraphWithBookmark("第七页三级标题2", 3, bookmarkName6_1_2)
+	if len(p6_1_2.Runs) > 0 {
+		if p6_1_2.Runs[0].Properties == nil {
+			p6_1_2.Runs[0].Properties = &RunProperties{}
+		}
+		// 设置字体格式：小四（12磅 * 2 = 24）
+		p6_1_2.Runs[0].Properties.FontFamily = &FontFamily{ASCII: "SimSun", HAnsi: "SimSun", EastAsia: "SimSun"}
+		p6_1_2.Runs[0].Properties.FontSize = &FontSize{Val: "24"}
+		p6_1_2.Runs[0].Properties.Color = &Color{Val: "000000"}
+		p6_1_2.Runs[0].Properties.Bold = &Bold{}
+	}
+	
+	// 添加另一个二级标题：小四（12磅），宋体，加粗
+	bookmarkName6_2 := "_Toc_第七页二级标题2"
+	p6_2 := doc.AddHeadingParagraphWithBookmark("第七页二级标题2", 2, bookmarkName6_2)
+	if len(p6_2.Runs) > 0 {
+		if p6_2.Runs[0].Properties == nil {
+			p6_2.Runs[0].Properties = &RunProperties{}
+		}
+		// 设置字体格式：小四（12磅 * 2 = 24）
+		p6_2.Runs[0].Properties.FontFamily = &FontFamily{ASCII: "SimSun", HAnsi: "SimSun", EastAsia: "SimSun"}
+		p6_2.Runs[0].Properties.FontSize = &FontSize{Val: "24"}
+		p6_2.Runs[0].Properties.Color = &Color{Val: "000000"}
+		p6_2.Runs[0].Properties.Bold = &Bold{}
+	}
+	
+	// 添加内容段落
+	contentPara6 := doc.AddParagraph("这是第七页的内容，用于测试多级标题在目录中的显示效果。")
+	if len(contentPara6.Runs) > 0 {
+		if contentPara6.Runs[0].Properties == nil {
+			contentPara6.Runs[0].Properties = &RunProperties{}
+		}
+		contentPara6.Runs[0].Properties.FontFamily = &FontFamily{ASCII: "SimSun", HAnsi: "SimSun", EastAsia: "SimSun"}
+		contentPara6.Runs[0].Properties.FontSize = &FontSize{Val: "24"}
+		contentPara6.Runs[0].Properties.Color = &Color{Val: "000000"}
+	}
+	
 	// 在目录页位置生成目录
 	tocConfig := &TOCConfig{
 		Title:        "目录",
@@ -258,7 +382,7 @@ func TestHeaderStyleFixed(t *testing.T) {
 		RightAlign:   true,
 		UseHyperlink: true,
 		DotLeader:    true,
-		PageOffset:   6, // 过滤掉封面、目录、第1-4页（共5页）
+		PageOffset:   4, // 过滤掉封面、目录、第1-4页（共6页）
 	}
 	
 	// 调用toc.go中的方法生成目录
