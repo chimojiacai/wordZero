@@ -572,15 +572,18 @@ func (d *Document) collectHeadingsWithBookmarks(maxLevel int, skipIndex int) []T
 	physicalPage := 1 // 物理页码（仅用于判断标题是否在目录之后，不用于计算显示页码）
 	elementIndex := 0
 	currentBookmarkName := "" // 当前标题对应的书签名称
-
+	tocPhysicalPage := 0 // 目录所在的物理页码
+	foundTOC := false    // 是否已找到目录
+	
 	// 遍历所有元素，收集标题并提取书签
 	for _, element := range d.Body.Elements {
 		elementIndex++
-
+		
 		// 跳过指定索引的元素（如目录占位符）
 		if elementIndex-1 == skipIndex {
-			// 目录页是物理第2页
-			physicalPage = 2
+			// 记录目录所在的物理页码
+			tocPhysicalPage = physicalPage
+			foundTOC = true
 			continue
 		}
 
@@ -663,8 +666,9 @@ func (d *Document) collectHeadingsWithBookmarks(maxLevel int, skipIndex int) []T
 					text := textBuilder.String()
 
 					if text != "" {
-						// 如果物理页码小于3（在目录之前），跳过
-						if titlePhysicalPage < 3 {
+						// 如果标题在目录之前，跳过
+						// 使用动态计算的目录页码，而不是硬编码的3
+						if foundTOC && titlePhysicalPage <= tocPhysicalPage {
 							continue
 						}
 
@@ -719,7 +723,7 @@ func (d *Document) collectHeadingsWithBookmarks(maxLevel int, skipIndex int) []T
 // createWordFieldTOC 创建使用真正Word域字段的目录
 func (d *Document) createWordFieldTOC(config *TOCConfig, entries []TOCEntry) []interface{} {
 	var elements []interface{}
-
+	
 	// 创建目录SDT容器
 	tocSDT := &SDT{
 		Properties: &SDTProperties{
@@ -746,7 +750,7 @@ func (d *Document) createWordFieldTOC(config *TOCConfig, entries []TOCEntry) []i
 			Elements: []interface{}{},
 		},
 	}
-
+	
 	// 添加目录标题段落
 	titlePara := &Paragraph{
 		Properties: &ParagraphProperties{
@@ -772,9 +776,9 @@ func (d *Document) createWordFieldTOC(config *TOCConfig, entries []TOCEntry) []i
 			},
 		},
 	}
-
+	
 	tocSDT.Content.Elements = append(tocSDT.Content.Elements, titlePara)
-
+	
 	// 创建主TOC域段落
 	tocFieldPara := &Paragraph{
 		Properties: &ParagraphProperties{
@@ -791,7 +795,7 @@ func (d *Document) createWordFieldTOC(config *TOCConfig, entries []TOCEntry) []i
 		},
 		Runs: []Run{},
 	}
-
+	
 	// 添加TOC域开始
 	tocFieldPara.Runs = append(tocFieldPara.Runs, Run{
 		Properties: &RunProperties{
@@ -803,9 +807,9 @@ func (d *Document) createWordFieldTOC(config *TOCConfig, entries []TOCEntry) []i
 			FieldCharType: "begin",
 		},
 	})
-
-	// 添加TOC指令
-	instrContent := fmt.Sprintf("TOC \\o \"1-%d\" \\h \\u", config.MaxLevel)
+	
+	// 添加TOC指令 - 使用 \n 开关不显示页码，因为我们手动创建条目
+	instrContent := fmt.Sprintf("TOC \\o \"1-%d\" \\h \\u \\n", config.MaxLevel)
 	tocFieldPara.Runs = append(tocFieldPara.Runs, Run{
 		Properties: &RunProperties{
 			Bold:     &Bold{},
@@ -817,7 +821,7 @@ func (d *Document) createWordFieldTOC(config *TOCConfig, entries []TOCEntry) []i
 			Content: instrContent,
 		},
 	})
-
+	
 	// 添加TOC域分隔符
 	tocFieldPara.Runs = append(tocFieldPara.Runs, Run{
 		Properties: &RunProperties{
@@ -829,15 +833,15 @@ func (d *Document) createWordFieldTOC(config *TOCConfig, entries []TOCEntry) []i
 			FieldCharType: "separate",
 		},
 	})
-
+	
 	tocSDT.Content.Elements = append(tocSDT.Content.Elements, tocFieldPara)
-
+	
 	// 为每个条目创建超链接段落
 	for _, entry := range entries {
 		entryPara := d.createTOCEntryWithFields(entry, config)
 		tocSDT.Content.Elements = append(tocSDT.Content.Elements, entryPara)
 	}
-
+	
 	// 添加TOC域结束段落
 	endPara := &Paragraph{
 		Properties: &ParagraphProperties{
@@ -858,10 +862,10 @@ func (d *Document) createWordFieldTOC(config *TOCConfig, entries []TOCEntry) []i
 			},
 		},
 	}
-
+	
 	tocSDT.Content.Elements = append(tocSDT.Content.Elements, endPara)
 	elements = append(elements, tocSDT)
-
+	
 	return elements
 }
 
@@ -879,7 +883,7 @@ func (d *Document) createTOCEntryWithFields(entry TOCEntry, config *TOCConfig) *
 	default:
 		styleVal = fmt.Sprintf("%d", 12+entry.Level)
 	}
-
+	
 	para := &Paragraph{
 		Properties: &ParagraphProperties{
 			ParagraphStyle: &ParagraphStyle{Val: styleVal},
@@ -895,10 +899,11 @@ func (d *Document) createTOCEntryWithFields(entry TOCEntry, config *TOCConfig) *
 		},
 		Runs: []Run{},
 	}
-
-	// 为每个条目生成唯一的书签ID
-	anchor := fmt.Sprintf("_Toc%d", generateUniqueID(entry.Text))
-
+	
+	// 使用实际的书签ID（从entry中获取），而不是重新生成
+	// 这样可以确保PAGEREF引用的书签与标题段落的书签一致
+	anchor := entry.BookmarkID
+	
 	// 创建超链接域开始
 	para.Runs = append(para.Runs, Run{
 		Properties: &RunProperties{
@@ -908,7 +913,7 @@ func (d *Document) createTOCEntryWithFields(entry TOCEntry, config *TOCConfig) *
 			FieldCharType: "begin",
 		},
 	})
-
+	
 	// 添加超链接指令
 	para.Runs = append(para.Runs, Run{
 		InstrText: &InstrText{
@@ -916,56 +921,57 @@ func (d *Document) createTOCEntryWithFields(entry TOCEntry, config *TOCConfig) *
 			Content: fmt.Sprintf(" HYPERLINK \\l %s ", anchor),
 		},
 	})
-
+	
 	// 超链接域分隔符
 	para.Runs = append(para.Runs, Run{
 		FieldChar: &FieldChar{
 			FieldCharType: "separate",
 		},
 	})
-
+	
 	// 添加标题文本
 	para.Runs = append(para.Runs, Run{
 		Text: Text{Content: entry.Text},
 	})
-
+	
 	// 添加制表符
 	para.Runs = append(para.Runs, Run{
 		Text: Text{Content: "\t"},
 	})
-
+	
 	// 添加页码引用域
 	para.Runs = append(para.Runs, Run{
 		FieldChar: &FieldChar{
 			FieldCharType: "begin",
 		},
 	})
-
+	
 	para.Runs = append(para.Runs, Run{
 		InstrText: &InstrText{
 			Space:   "preserve",
-			Content: fmt.Sprintf(" PAGEREF %s ", anchor), // 移除\h开关，因为HYPERLINK已经处理了跳转
+			Content: fmt.Sprintf(" PAGEREF %s \\h ", anchor), // 添加\h开关以创建超链接
 		},
 	})
-
+	
 	para.Runs = append(para.Runs, Run{
 		FieldChar: &FieldChar{
 			FieldCharType: "separate",
 		},
 	})
-
-	// 页码文本
+	
+	// 页码文本（使用占位符，PAGEREF会自动更新为正确页码）
+	// 使用空字符串作为初始值，让Word自动计算
 	para.Runs = append(para.Runs, Run{
-		Text: Text{Content: fmt.Sprintf("%d", entry.PageNum)},
+		Text: Text{Content: ""},
 	})
-
+	
 	// 页码域结束
 	para.Runs = append(para.Runs, Run{
 		FieldChar: &FieldChar{
 			FieldCharType: "end",
 		},
 	})
-
+	
 	// 超链接域结束
 	para.Runs = append(para.Runs, Run{
 		Properties: &RunProperties{
@@ -975,7 +981,7 @@ func (d *Document) createTOCEntryWithFields(entry TOCEntry, config *TOCConfig) *
 			FieldCharType: "end",
 		},
 	})
-
+	
 	return para
 }
 
