@@ -12,6 +12,9 @@ import (
 )
 
 func TestHeaderStyleFixed(t *testing.T) {
+	// 启用调试日志
+	SetGlobalLevel(LogLevelDebug)
+	
 	doc := New()
 	doc.SetPageSettings(&PageSettings{
 		MarginTop:    25,

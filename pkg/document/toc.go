@@ -557,25 +557,25 @@ func (d *Document) GenerateTOCAtPosition(config *TOCConfig, insertIndex, skipInd
 
 // collectHeadingsWithBookmarks 收集标题信息，并提取实际的书签名称
 // skipIndex: 要跳过的元素索引（如目录占位符段落）
-// pageOffset: 页码偏移量，用于过滤掉封面等页数（目录页码 = 物理页码 - pageOffset）
+// pageOffset: 页码偏移量，用于过滤掉封面等页数
 //
 // 页码计算说明：
 // ===================
-// 此方法会计算每个标题所在的物理页码，然后减去偏移量得到目录中显示的页码。
-// 计算基于以下假设：
-// - 每个分页符或分节符会开始新的一页
-// - 标题段落本身所在的页码在处理分页符之前确定
-// - 目录页码 = 物理页码 - pageOffset
+// 简化逻辑：直接使用物理页码
+// 1. 遍历文档元素，跟踪物理页码
+// 2. 当遇到分页符或分节符时，递增物理页码
+// 3. 当遇到标题时，记录标题名称和当前物理页码
+// 4. 生成目录时，直接使用物理页码
 //
-// 注意：这是基于XML结构的估算，实际页码可能因Word渲染而略有不同。
-// 但对于大多数情况，这个估算足够准确，可以实现"一步到位"的效果。
+// 这种方法的优点：
+// - 简单直接，不需要复杂的计算
+// - 直接使用物理页码，不受分节符重置影响
+// - 自动适应竖版横版交替的情况
 func (d *Document) collectHeadingsWithBookmarks(maxLevel int, skipIndex int, pageOffset int) []TOCEntry {
 	var entries []TOCEntry
-	physicalPage := 1   // 物理页码（从1开始）
-	logicalPageNum := 1 // 逻辑页码（页脚显示的页码）
+	physicalPageNum := 1 // 物理页码
 	elementIndex := 0
-	currentBookmarkName := ""     // 当前标题对应的书签名称
-	pageNumberingStarted := false // 是否已开始页码编号
+	currentBookmarkName := "" // 当前标题对应的书签名称
 	
 	// 遍历所有元素，收集标题并提取书签
 	for _, element := range d.Body.Elements {
@@ -587,23 +587,10 @@ func (d *Document) collectHeadingsWithBookmarks(maxLevel int, skipIndex int, pag
 		}
 		
 		// 检查是否是分节符（SectionProperties）
-		if sectionProps, ok := element.(*SectionProperties); ok {
-			// 分节符后的第一页
-			physicalPage++
-			
-			// 检查是否设置了起始页码
-			if sectionProps.PageNumType != nil && sectionProps.PageNumType.Start != "" {
-				// 如果设置了起始页码，重置逻辑页码
-				startPage := parseInt(sectionProps.PageNumType.Start)
-				if startPage > 0 {
-					logicalPageNum = startPage
-					pageNumberingStarted = true
-					Debugf("发现分节符设置起始页码: %d (物理页: %d)", startPage, physicalPage)
-				}
-			} else if pageNumberingStarted {
-				// 如果没有设置起始页码，但已经开始页码编号，则递增
-				logicalPageNum++
-			}
+		if _, ok := element.(*SectionProperties); ok {
+			// 分节符总是递增物理页码
+			physicalPageNum++
+			Debugf("分节符后物理页码: %d", physicalPageNum)
 			continue
 		}
 		
@@ -623,45 +610,17 @@ func (d *Document) collectHeadingsWithBookmarks(maxLevel int, skipIndex int, pag
 		
 		// 检查段落中的分页符和分节符
 		if paragraph, ok := element.(*Paragraph); ok {
-			// 保存标题所在的逻辑页码（在处理分页符和分节符之前）
-			//titleLogicalPage := logicalPageNum
-			
 			// 检查是否有分页符
 			if paragraph.Properties != nil && paragraph.Properties.PageBreak != nil {
-				physicalPage++
-				if pageNumberingStarted {
-					logicalPageNum++
-				}
-				Debugf("分页符后物理页: %d, 逻辑页码: %d", physicalPage, logicalPageNum)
+				physicalPageNum++
+				Debugf("分页符后物理页码: %d", physicalPageNum)
 			}
 			
 			// 检查是否有分节符
 			if paragraph.Properties != nil && paragraph.Properties.SectionProperties != nil {
-				// 检查是否设置了起始页码
-				hasStartPage := false
-				if paragraph.Properties.SectionProperties.PageNumType != nil &&
-					paragraph.Properties.SectionProperties.PageNumType.Start != "" {
-					startPage := parseInt(paragraph.Properties.SectionProperties.PageNumType.Start)
-					if startPage > 0 {
-						logicalPageNum = startPage
-						pageNumberingStarted = true
-						hasStartPage = true
-						Debugf("发现分节符设置起始页码: %d (物理页: %d, 逻辑页码: %d)", startPage, physicalPage, logicalPageNum)
-					}
-				}
-				
-				// 分节符后的第一页
-				if paragraph.Properties.PageBreak == nil {
-					// 如果没有分页符，分节符后的第一页是当前页的下一页
-					physicalPage++
-					// 只有在没有设置起始页码的情况下，才增加逻辑页码
-					if pageNumberingStarted && !hasStartPage {
-						logicalPageNum++
-					}
-					Debugf("分节符后物理页: %d, 逻辑页码: %d", physicalPage, logicalPageNum)
-				}
-				// 如果有分页符，physicalPage已经在上面更新了
-				// logicalPageNum只有在没有设置起始页码的情况下才增加
+				// 分节符总是递增物理页码
+				physicalPageNum++
+				Debugf("分节符后物理页码: %d", physicalPageNum)
 			}
 			
 			// 检查是否是标题
@@ -703,20 +662,16 @@ func (d *Document) collectHeadingsWithBookmarks(maxLevel int, skipIndex int, pag
 					
 					if text != "" {
 						// ============================================================
-						// 页码计算：使用物理页码减去偏移量
+						// 直接使用物理页码
 						// ============================================================
-						// 这里使用物理页码减去偏移量作为目录中显示的页码。
-						// 例如：如果物理页码是6，偏移量是5，则目录页码显示为1。
-						// PAGEREF字段仍然存在，可以在Word中更新以获得精确页码。
-						// ============================================================
-						estimatedPage := physicalPage - pageOffset
+						estimatedPage := physicalPageNum
 						if estimatedPage < 1 {
-							estimatedPage = 1 // 确保页码至少为1
+							estimatedPage = 1
 						}
 						
 						// 调试输出
-						Debugf("标题: %s, 书签: %s, 物理页: %d, 偏移量: %d, 目录页码: %d",
-							text, currentBookmarkName, physicalPage, pageOffset, estimatedPage)
+						Debugf("标题: %s, 书签: %s, 物理页码: %d, 目录页码: %d",
+							text, currentBookmarkName, physicalPageNum, estimatedPage)
 						
 						// 使用实际的书签名称（如果存在），否则生成默认的书签ID
 						bookmarkID := currentBookmarkName
@@ -728,7 +683,7 @@ func (d *Document) collectHeadingsWithBookmarks(maxLevel int, skipIndex int, pag
 						entry := TOCEntry{
 							Text:       text,
 							Level:      level,
-							PageNum:    estimatedPage, // 使用逻辑页码
+							PageNum:    estimatedPage, // 直接使用物理页码
 							BookmarkID: bookmarkID,
 						}
 						entries = append(entries, entry)
