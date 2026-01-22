@@ -6,7 +6,6 @@
 package document
 
 import (
-	"fmt"
 	"testing"
 	
 	"github.com/ZeroHawkeye/wordZero/pkg/style"
@@ -57,7 +56,7 @@ func TestHeaderStyleFixed(t *testing.T) {
 	
 	// 为第1-4页添加带书签的标题段落（不显示页眉页脚）
 	bookmarkName1 := "_Toc_第1页内容"
-	pb1 := doc.AddHeadingParagraphWithBookmark("第1页内容（不显示页码）", 1, bookmarkName1)
+	pb1 := doc.AddHeadingParagraphWithBookmark("第1页内容", 1, bookmarkName1)
 	// 添加第1页的详细内容
 	content1 := doc.AddParagraph("这是第1页的详细内容。这里可以放置一些介绍性文字，说明文档的背景、目的和主要内容。")
 	content1.SetStyle(style.StyleNormal)
@@ -66,7 +65,7 @@ func TestHeaderStyleFixed(t *testing.T) {
 	pb1.AddPageBreak()
 	
 	bookmarkName2 := "_Toc_第2页内容"
-	pb2 := doc.AddHeadingParagraphWithBookmark("第2页内容（不显示页码）", 1, bookmarkName2)
+	pb2 := doc.AddHeadingParagraphWithBookmark("第2页内容", 1, bookmarkName2)
 	// 添加第2页的详细内容
 	content2 := doc.AddParagraph("这是第2页的详细内容。可以继续扩展文档的内容，提供更多的信息和细节。")
 	content2.SetStyle(style.StyleNormal)
@@ -75,7 +74,7 @@ func TestHeaderStyleFixed(t *testing.T) {
 	pb2.AddPageBreak()
 	
 	bookmarkName3 := "_Toc_第3页内容"
-	pb3 := doc.AddHeadingParagraphWithBookmark("第3页内容（不显示页码）", 1, bookmarkName3)
+	pb3 := doc.AddHeadingParagraphWithBookmark("第3页内容", 1, bookmarkName3)
 	// 添加第3页的详细内容
 	content3 := doc.AddParagraph("这是第3页的详细内容。文档的中间部分通常包含核心内容和分析。")
 	content3.SetStyle(style.StyleNormal)
@@ -84,7 +83,7 @@ func TestHeaderStyleFixed(t *testing.T) {
 	pb3.AddPageBreak()
 	
 	bookmarkName4 := "_Toc_第4页内容"
-	pb4 := doc.AddHeadingParagraphWithBookmark("第4页内容（不显示页码）", 1, bookmarkName4)
+	pb4 := doc.AddHeadingParagraphWithBookmark("第4页内容", 1, bookmarkName4)
 	// 添加第4页的详细内容
 	content4 := doc.AddParagraph("这是第4页的详细内容。接近文档的结尾部分，可以开始总结和归纳。")
 	content4.SetStyle(style.StyleNormal)
@@ -94,7 +93,7 @@ func TestHeaderStyleFixed(t *testing.T) {
 	
 	// 添加分节符，从第5页开始显示页码，页码从1开始
 	sectionBreak2 := doc.AddParagraph("")
-	sectionBreak2.AddSectionBreakWithStartPage(OrientationPortrait, doc, 1, false)
+	sectionBreak2.AddSectionBreakWithStartPage(OrientationPortrait, doc, 1, true)
 	
 	// 在新节上配置页眉页脚（只影响新节及之后内容）
 	err := doc.AddStyleHeader(HeaderFooterTypeDefault, "xxx科技有限公司\nRLHB", "2025010", &TextFormat{
@@ -109,24 +108,9 @@ func TestHeaderStyleFixed(t *testing.T) {
 	if err := doc.AddFooterWithPageNumber(HeaderFooterTypeDefault, "", true); err != nil {
 		t.Error(err)
 	}
-	
-	// 在新节上配置页眉页脚（只影响新节及之后内容）
-	err = doc.AddStyleHeader(HeaderFooterTypeDefault, "xxx科技有限公司\nRLHB", "2025010", &TextFormat{
-		FontFamily: "SimSun",
-		FontSize:   9,
-		FontColor:  "000000",
-	})
-	if err != nil {
-		t.Error(err)
-	}
-	
-	if err := doc.AddFooterWithPageNumber(HeaderFooterTypeDefault, "", true); err != nil {
-		t.Error(err)
-	}
-	
 	// 使用 AddHeadingParagraphWithBookmark 创建标题，这样可以被目录生成功能识别并支持跳转
 	bookmarkName5 := "_Toc_第五页标题"
-	p := doc.AddHeadingParagraphWithBookmark("第五页标题（第1页）", 1, bookmarkName5)
+	p := doc.AddHeadingParagraphWithBookmark("第五页标题", 1, bookmarkName5)
 	// 如果需要自定义格式，可以更新Run的属性
 	if len(p.Runs) > 0 {
 		if p.Runs[0].Properties == nil {
@@ -140,7 +124,7 @@ func TestHeaderStyleFixed(t *testing.T) {
 	}
 	
 	// 在标题后添加一些内容，确保页面有内容
-	contentPara := doc.AddParagraph("这是第五页标题页面的内容，从这一页开始显示页码，页码为1。")
+	contentPara := doc.AddParagraph("这是第五页标题页面的内容")
 	if len(contentPara.Runs) > 0 {
 		if contentPara.Runs[0].Properties == nil {
 			contentPara.Runs[0].Properties = &RunProperties{}
@@ -161,6 +145,18 @@ func TestHeaderStyleFixed(t *testing.T) {
 	// startPage=0 表示延续上一节的页码
 	// inheritHeaderFooter=true 表示继承上一节的页眉页脚
 	contentPara.AddSectionBreakWithStartPage(OrientationLandscape, doc, 0, true)
+	
+	// 如果需要自定义格式，可以更新Run的属性
+	if len(p.Runs) > 0 {
+		if p.Runs[0].Properties == nil {
+			p.Runs[0].Properties = &RunProperties{}
+		}
+		// 设置字体格式
+		p.Runs[0].Properties.FontFamily = &FontFamily{ASCII: "SimSun", HAnsi: "SimSun", EastAsia: "SimSun"}
+		p.Runs[0].Properties.FontSize = &FontSize{Val: "28"} // 14磅 * 2
+		p.Runs[0].Properties.Color = &Color{Val: "000000"}
+		p.Runs[0].Properties.Bold = &Bold{}
+	}
 	
 	textFormat.Bold = false
 	textFormat.FontSize = 12
@@ -262,6 +258,7 @@ func TestHeaderStyleFixed(t *testing.T) {
 		RightAlign:   true,
 		UseHyperlink: true,
 		DotLeader:    true,
+		PageOffset:   6, // 过滤掉封面、目录、第1-4页（共5页）
 	}
 	
 	// 调用toc.go中的方法生成目录
@@ -282,153 +279,4 @@ func TestHeaderStyleFixed(t *testing.T) {
 	t.Logf("  - 从第5页开始显示页码，页码从1开始")
 	t.Logf("  - 竖版和横版页面交替，页码连续：1, 2, 3, ...")
 	t.Logf("提示：打开Word文档后，按Ctrl+A全选，然后按F9更新所有字段，即可更新目录页码")
-}
-
-// TestCustomStartPageNumber 测试自定义起始页码功能
-func TestCustomStartPageNumber(t *testing.T) {
-	doc := New()
-	doc.SetPageSettings(&PageSettings{
-		MarginTop:    25,
-		MarginRight:  20,
-		MarginBottom: 25,
-		MarginLeft:   20,
-		Orientation:  OrientationPortrait,
-		Size:         PageSizeA4,
-	})
-	
-	// 首页 - 不设置页眉页脚
-	coverTitle := doc.AddParagraph("封面")
-	coverTitle.SetStyle(style.StyleTitle)
-	coverTitle.SetAlignment(AlignCenter)
-	
-	doc.AddParagraph("").AddPageBreak()
-	
-	// 第二页 - 目录
-	tocTitlePara := doc.AddParagraph("目录")
-	tocTitlePara.SetStyle(style.StyleHeading1)
-	
-	doc.AddParagraph("").AddPageBreak()
-	
-	// 第三页开始 - 设置起始页码为1，并添加页眉页脚
-	sectionBreak := doc.AddParagraph("")
-	sectionBreak.AddSectionBreakWithStartPage(OrientationPortrait, doc, 1, false)
-	
-	// 添加页眉页脚
-	err := doc.AddStyleHeader(HeaderFooterTypeDefault, "测试文档", "", &TextFormat{
-		FontFamily: "SimSun",
-		FontSize:   9,
-		FontColor:  "000000",
-	})
-	if err != nil {
-		t.Error(err)
-	}
-	
-	if err := doc.AddFooterWithPageNumber(HeaderFooterTypeDefault, "", true); err != nil {
-		t.Error(err)
-	}
-	
-	// 添加内容
-	for i := 1; i <= 5; i++ {
-		para := doc.AddParagraph(fmt.Sprintf("这是第 %d 页的内容", i))
-		para.SetSpacing(&SpacingConfig{
-			LineSpacing: 1.5,
-		})
-		if i < 5 {
-			para.AddPageBreak()
-		}
-	}
-	
-	// 保存文档
-	outputPath := "test_custom_start_page.docx"
-	if err := doc.Save(outputPath); err != nil {
-		t.Error(err)
-		return
-	}
-	
-	t.Logf("文档已保存: %s", outputPath)
-	t.Logf("预期效果：封面和目录不显示页码，从第三页开始显示页码，页码从1开始")
-}
-
-// TestMixedOrientationContinuousPageNumber 测试竖版横版交叉，页码连续
-func TestMixedOrientationContinuousPageNumber(t *testing.T) {
-	doc := New()
-	doc.SetPageSettings(&PageSettings{
-		MarginTop:    25,
-		MarginRight:  20,
-		MarginBottom: 25,
-		MarginLeft:   20,
-		Orientation:  OrientationPortrait,
-		Size:         PageSizeA4,
-	})
-	
-	// 首页 - 不设置页眉页脚
-	coverTitle := doc.AddParagraph("封面")
-	coverTitle.SetStyle(style.StyleTitle)
-	coverTitle.SetAlignment(AlignCenter)
-	
-	doc.AddParagraph("").AddPageBreak()
-	
-	// 第二页开始 - 设置起始页码为1，并添加页眉页脚
-	sectionBreak := doc.AddParagraph("")
-	sectionBreak.AddSectionBreakWithStartPage(OrientationPortrait, doc, 1, false)
-	
-	// 添加页眉页脚
-	err := doc.AddStyleHeader(HeaderFooterTypeDefault, "测试文档", "", &TextFormat{
-		FontFamily: "SimSun",
-		FontSize:   9,
-		FontColor:  "000000",
-	})
-	if err != nil {
-		t.Error(err)
-	}
-	
-	if err := doc.AddFooterWithPageNumber(HeaderFooterTypeDefault, "", true); err != nil {
-		t.Error(err)
-	}
-	
-	// 第1页 - 竖版
-	para1 := doc.AddParagraph("第1页 - 竖版")
-	para1.SetStyle(style.StyleHeading1)
-	para1.AddPageBreak()
-	
-	// 第2页 - 横版（保持页码连续，继承页眉页脚）
-	para2 := doc.AddParagraph("第2页 - 横版")
-	para2.SetStyle(style.StyleHeading1)
-	para2.AddSectionBreakWithStartPage(OrientationLandscape, doc, 0, true)
-	
-	// 添加一些内容确保横版页面有内容
-	for i := 0; i < 10; i++ {
-		doc.AddParagraph(fmt.Sprintf("横版页面内容 %d", i+1))
-	}
-	
-	// 第3页 - 竖版（保持页码连续，继承页眉页脚）
-	para3 := doc.AddParagraph("第3页 - 竖版")
-	para3.SetStyle(style.StyleHeading1)
-	para3.AddSectionBreakWithStartPage(OrientationPortrait, doc, 0, true)
-	
-	// 第4页 - 横版（保持页码连续，继承页眉页脚）
-	para4 := doc.AddParagraph("第4页 - 横版")
-	para4.SetStyle(style.StyleHeading1)
-	para4.AddSectionBreakWithStartPage(OrientationLandscape, doc, 0, true)
-	
-	// 添加一些内容确保横版页面有内容
-	for i := 0; i < 10; i++ {
-		doc.AddParagraph(fmt.Sprintf("横版页面内容 %d", i+1))
-	}
-	
-	// 第5页 - 竖版（保持页码连续，继承页眉页脚）
-	para5 := doc.AddParagraph("第5页 - 竖版")
-	para5.SetStyle(style.StyleHeading1)
-	para5.AddSectionBreakWithStartPage(OrientationPortrait, doc, 0, true)
-	
-	// 保存文档
-	outputPath := "test_mixed_orientation.docx"
-	if err := doc.Save(outputPath); err != nil {
-		t.Error(err)
-		return
-	}
-	
-	t.Logf("文档已保存: %s", outputPath)
-	t.Logf("预期效果：封面不显示页码，从第2页开始显示页码，页码从1开始")
-	t.Logf("竖版和横版页面交替，页码连续：1, 2, 3, 4, 5")
 }

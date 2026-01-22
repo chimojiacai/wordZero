@@ -15,6 +15,7 @@ type TOCConfig struct {
 	RightAlign   bool   // 页码是否右对齐，默认为true
 	UseHyperlink bool   // 是否使用超链接，默认为true
 	DotLeader    bool   // 是否使用点状引导线，默认为true
+	PageOffset   int    // 页码偏移量，用于过滤掉封面等页数（目录页码 = 物理页码 - PageOffset）
 }
 
 // TOCEntry 目录条目
@@ -71,6 +72,7 @@ func DefaultTOCConfig() *TOCConfig {
 		RightAlign:   true,
 		UseHyperlink: true,
 		DotLeader:    true,
+		PageOffset:   0, // 默认不偏移
 	}
 }
 
@@ -79,25 +81,25 @@ func (d *Document) GenerateTOC(config *TOCConfig) error {
 	if config == nil {
 		config = DefaultTOCConfig()
 	}
-
+	
 	// 收集标题信息
 	entries := d.collectHeadings(config.MaxLevel)
-
+	
 	// 创建目录SDT
 	tocSDT := d.CreateTOCSDT(config.Title, config.MaxLevel)
-
+	
 	// 为每个标题条目添加到目录中
 	for i, entry := range entries {
 		entryID := fmt.Sprintf("14746%d", 3000+i)
 		tocSDT.AddTOCEntry(entry.Text, entry.Level, entry.PageNum, entryID)
 	}
-
+	
 	// 完成目录SDT构建
 	tocSDT.FinalizeTOCSDT()
-
+	
 	// 添加到文档中
 	d.Body.Elements = append(d.Body.Elements, tocSDT)
-
+	
 	return nil
 }
 
@@ -105,16 +107,16 @@ func (d *Document) GenerateTOC(config *TOCConfig) error {
 func (d *Document) UpdateTOC() error {
 	// 重新收集标题信息
 	entries := d.collectHeadings(9) // 收集所有级别
-
+	
 	// 查找现有目录
 	tocStart := d.findTOCStart()
 	if tocStart == -1 {
 		return fmt.Errorf("未找到目录")
 	}
-
+	
 	// 删除现有目录条目
 	d.removeTOCEntries(tocStart)
-
+	
 	// 重新生成目录条目
 	config := DefaultTOCConfig()
 	for _, entry := range entries {
@@ -122,7 +124,7 @@ func (d *Document) UpdateTOC() error {
 			return fmt.Errorf("更新目录条目失败: %v", err)
 		}
 	}
-
+	
 	return nil
 }
 
@@ -138,7 +140,7 @@ func (d *Document) AddHeadingWithBookmark(text string, level int, bookmarkName s
 // 注意：此方法用于旧的GenerateTOC实现，页码由PAGEREF字段自动更新
 func (d *Document) collectHeadings(maxLevel int) []TOCEntry {
 	var entries []TOCEntry
-
+	
 	for _, element := range d.Body.Elements {
 		if paragraph, ok := element.(*Paragraph); ok {
 			// 检查标题级别
@@ -158,7 +160,7 @@ func (d *Document) collectHeadings(maxLevel int) []TOCEntry {
 			}
 		}
 	}
-
+	
 	return entries
 }
 
@@ -166,7 +168,7 @@ func (d *Document) collectHeadings(maxLevel int) []TOCEntry {
 func (d *Document) getHeadingLevel(paragraph *Paragraph) int {
 	if paragraph.Properties != nil && paragraph.Properties.ParagraphStyle != nil {
 		styleVal := paragraph.Properties.ParagraphStyle.Val
-
+		
 		// 根据样式ID映射标题级别 - 支持数字ID
 		switch styleVal {
 		case "1": // heading 1 (有些文档使用1作为标题1)
@@ -190,7 +192,7 @@ func (d *Document) getHeadingLevel(paragraph *Paragraph) int {
 		case "10": // heading 9
 			return 9
 		}
-
+		
 		// 支持标准样式名称匹配
 		switch styleVal {
 		case "Heading1", "heading1", "Title1":
@@ -212,7 +214,7 @@ func (d *Document) getHeadingLevel(paragraph *Paragraph) int {
 		case "Heading9", "heading9", "Title9":
 			return 9
 		}
-
+		
 		// 支持通用模式匹配（处理Heading后面跟数字的情况）
 		if strings.HasPrefix(strings.ToLower(styleVal), "heading") {
 			// 提取数字部分
@@ -272,35 +274,35 @@ func (d *Document) insertTOCField(config *TOCConfig) error {
 	if !config.ShowPageNum {
 		instr += " \\n"
 	}
-
+	
 	// 创建目录域段落
 	tocPara := &Paragraph{
 		Properties: &ParagraphProperties{
 			ParagraphStyle: &ParagraphStyle{Val: "TOC1"},
 		},
 	}
-
+	
 	// 添加域开始
 	fieldStart := Run{
 		Properties: &RunProperties{},
 		Text:       Text{Content: ""}, // 域开始标记
 	}
-
+	
 	// 添加域指令
 	fieldInstr := Run{
 		Properties: &RunProperties{},
 		Text:       Text{Content: instr},
 	}
-
+	
 	// 添加域结束
 	fieldEnd := Run{
 		Properties: &RunProperties{},
 		Text:       Text{Content: ""}, // 域结束标记
 	}
-
+	
 	tocPara.Runs = append(tocPara.Runs, fieldStart, fieldInstr, fieldEnd)
 	d.Body.Elements = append(d.Body.Elements, tocPara)
-
+	
 	return nil
 }
 
@@ -312,20 +314,20 @@ func (d *Document) addTOCEntry(entry TOCEntry, config *TOCConfig) error {
 			ParagraphStyle: &ParagraphStyle{Val: fmt.Sprintf("TOC%d", entry.Level)},
 		},
 	}
-
+	
 	if config.UseHyperlink {
 		// 创建超链接
 		hyperlink := &Hyperlink{
 			Anchor: entry.BookmarkID,
 		}
-
+		
 		// 标题文本
 		titleRun := Run{
 			Properties: &RunProperties{},
 			Text:       Text{Content: entry.Text},
 		}
 		hyperlink.Runs = append(hyperlink.Runs, titleRun)
-
+		
 		// 如果显示页码，添加引导线和页码
 		if config.ShowPageNum {
 			if config.DotLeader {
@@ -336,7 +338,7 @@ func (d *Document) addTOCEntry(entry TOCEntry, config *TOCConfig) error {
 				}
 				hyperlink.Runs = append(hyperlink.Runs, leaderRun)
 			}
-
+			
 			// 添加页码
 			pageRun := Run{
 				Properties: &RunProperties{},
@@ -344,7 +346,7 @@ func (d *Document) addTOCEntry(entry TOCEntry, config *TOCConfig) error {
 			}
 			hyperlink.Runs = append(hyperlink.Runs, pageRun)
 		}
-
+		
 		// 将超链接添加到段落中
 		// 这里需要特殊处理，因为Hyperlink不是标准的Run
 		// 简化处理，直接作为文本添加
@@ -353,7 +355,7 @@ func (d *Document) addTOCEntry(entry TOCEntry, config *TOCConfig) error {
 			Text:       Text{Content: entry.Text},
 		}
 		entryPara.Runs = append(entryPara.Runs, hyperlinkRun)
-
+		
 		if config.ShowPageNum {
 			pageRun := Run{
 				Properties: &RunProperties{},
@@ -368,7 +370,7 @@ func (d *Document) addTOCEntry(entry TOCEntry, config *TOCConfig) error {
 			Text:       Text{Content: entry.Text},
 		}
 		entryPara.Runs = append(entryPara.Runs, titleRun)
-
+		
 		if config.ShowPageNum {
 			pageRun := Run{
 				Properties: &RunProperties{},
@@ -377,7 +379,7 @@ func (d *Document) addTOCEntry(entry TOCEntry, config *TOCConfig) error {
 			entryPara.Runs = append(entryPara.Runs, pageRun)
 		}
 	}
-
+	
 	d.Body.Elements = append(d.Body.Elements, entryPara)
 	return nil
 }
@@ -400,10 +402,10 @@ func (d *Document) findTOCStart() int {
 func (d *Document) removeTOCEntries(startIndex int) {
 	// 简化处理：从startIndex开始查找并删除所有TOC样式的段落
 	var newElements []interface{}
-
+	
 	// 保留start之前的元素
 	newElements = append(newElements, d.Body.Elements[:startIndex]...)
-
+	
 	// 跳过TOC相关的元素
 	for i := startIndex; i < len(d.Body.Elements); i++ {
 		element := d.Body.Elements[i]
@@ -417,7 +419,7 @@ func (d *Document) removeTOCEntries(startIndex int) {
 			}
 		}
 	}
-
+	
 	d.Body.Elements = newElements
 }
 
@@ -426,18 +428,18 @@ func (d *Document) SetTOCStyle(level int, style *TextFormat) error {
 	if level < 1 || level > 9 {
 		return fmt.Errorf("目录级别必须在1-9之间")
 	}
-
+	
 	styleName := fmt.Sprintf("TOC%d", level)
-
+	
 	// 通过样式管理器设置目录样式
 	styleManager := d.GetStyleManager()
-
+	
 	// 创建段落样式（这里需要与样式系统集成）
 	// 简化处理，实际需要创建完整的样式定义
 	_ = styleManager
 	_ = styleName
 	_ = style
-
+	
 	return nil
 }
 
@@ -446,11 +448,11 @@ func (d *Document) AutoGenerateTOC(config *TOCConfig) error {
 	if config == nil {
 		config = DefaultTOCConfig()
 	}
-
+	
 	// 查找现有目录位置
 	tocStart := d.findTOCStart()
 	var insertIndex int
-
+	
 	if tocStart != -1 {
 		// 如果已有目录，删除现有目录条目
 		d.removeTOCEntries(tocStart)
@@ -459,17 +461,17 @@ func (d *Document) AutoGenerateTOC(config *TOCConfig) error {
 		// 如果没有目录，在文档开头插入
 		insertIndex = 0
 	}
-
+	
 	// 收集文档中的所有标题并为它们添加书签
 	entries := d.collectHeadingsAndAddBookmarks(config.MaxLevel)
-
+	
 	if len(entries) == 0 {
 		return fmt.Errorf("文档中未找到标题（样式ID为2-10的段落）")
 	}
-
+	
 	// 使用真正的Word域字段生成目录，而不是简化的SDT
 	tocElements := d.createWordFieldTOC(config, entries)
-
+	
 	// 将目录插入到指定位置
 	if insertIndex == 0 {
 		// 在开头插入
@@ -482,14 +484,14 @@ func (d *Document) AutoGenerateTOC(config *TOCConfig) error {
 		newElements = append(newElements, d.Body.Elements[insertIndex:]...)
 		d.Body.Elements = newElements
 	}
-
+	
 	return nil
 }
 
 // GetHeadingCount 获取文档中标题的数量，用于调试
 func (d *Document) GetHeadingCount() map[int]int {
 	counts := make(map[int]int)
-
+	
 	for _, element := range d.Body.Elements {
 		if paragraph, ok := element.(*Paragraph); ok {
 			level := d.getHeadingLevel(paragraph)
@@ -498,7 +500,7 @@ func (d *Document) GetHeadingCount() map[int]int {
 			}
 		}
 	}
-
+	
 	return counts
 }
 
@@ -514,25 +516,25 @@ func (d *Document) GenerateTOCAtPosition(config *TOCConfig, insertIndex, skipInd
 	if config == nil {
 		config = DefaultTOCConfig()
 	}
-
+	
 	// 收集标题信息，提取实际的书签名称
-	entries := d.collectHeadingsWithBookmarks(config.MaxLevel, skipIndex)
-
+	entries := d.collectHeadingsWithBookmarks(config.MaxLevel, skipIndex, config.PageOffset)
+	
 	if len(entries) == 0 {
 		return fmt.Errorf("未找到标题")
 	}
-
+	
 	// 创建目录SDT
 	tocSDT := d.CreateTOCSDT(config.Title, config.MaxLevel)
-
+	
 	// 为每个标题条目添加到目录中（使用实际的书签ID）
 	for _, entry := range entries {
 		tocSDT.AddTOCEntry(entry.Text, entry.Level, entry.PageNum, entry.BookmarkID)
 	}
-
+	
 	// 完成目录SDT构建
 	tocSDT.FinalizeTOCSDT()
-
+	
 	// 在指定位置插入目录（替换占位符）
 	if insertIndex >= 0 && insertIndex < len(d.Body.Elements) {
 		// 移除占位符
@@ -549,31 +551,31 @@ func (d *Document) GenerateTOCAtPosition(config *TOCConfig, insertIndex, skipInd
 		// 如果索引超出范围，直接添加到末尾
 		d.Body.Elements = append(d.Body.Elements, tocSDT)
 	}
-
+	
 	return nil
 }
 
 // collectHeadingsWithBookmarks 收集标题信息，并提取实际的书签名称
 // skipIndex: 要跳过的元素索引（如目录占位符段落）
+// pageOffset: 页码偏移量，用于过滤掉封面等页数（目录页码 = 物理页码 - pageOffset）
 //
-// 重要说明：页码计算
+// 页码计算说明：
 // ===================
-// Word的页码是基于渲染后的布局动态计算的，包括：
-// - 字体大小和样式
-// - 页边距和行距
-// - 段落间距
-// - 表格自动分页
-// - 图片大小和位置
-// - 内容动态变化（可多可少）
-// 这些因素在XML层面无法准确预测，因此我们完全依赖PAGEREF字段自动更新页码。
-// 代码中的physicalPage跟踪仅用于判断标题是否在目录之后，不用于计算页码。
-func (d *Document) collectHeadingsWithBookmarks(maxLevel int, skipIndex int) []TOCEntry {
+// 此方法会计算每个标题所在的物理页码，然后减去偏移量得到目录中显示的页码。
+// 计算基于以下假设：
+// - 每个分页符或分节符会开始新的一页
+// - 标题段落本身所在的页码在处理分页符之前确定
+// - 目录页码 = 物理页码 - pageOffset
+//
+// 注意：这是基于XML结构的估算，实际页码可能因Word渲染而略有不同。
+// 但对于大多数情况，这个估算足够准确，可以实现"一步到位"的效果。
+func (d *Document) collectHeadingsWithBookmarks(maxLevel int, skipIndex int, pageOffset int) []TOCEntry {
 	var entries []TOCEntry
-	physicalPage := 1 // 物理页码（仅用于判断标题是否在目录之后，不用于计算显示页码）
+	physicalPage := 1   // 物理页码（从1开始）
+	logicalPageNum := 1 // 逻辑页码（页脚显示的页码）
 	elementIndex := 0
-	currentBookmarkName := "" // 当前标题对应的书签名称
-	tocPhysicalPage := 0 // 目录所在的物理页码
-	foundTOC := false    // 是否已找到目录
+	currentBookmarkName := ""     // 当前标题对应的书签名称
+	pageNumberingStarted := false // 是否已开始页码编号
 	
 	// 遍历所有元素，收集标题并提取书签
 	for _, element := range d.Body.Elements {
@@ -581,58 +583,92 @@ func (d *Document) collectHeadingsWithBookmarks(maxLevel int, skipIndex int) []T
 		
 		// 跳过指定索引的元素（如目录占位符）
 		if elementIndex-1 == skipIndex {
-			// 记录目录所在的物理页码
-			tocPhysicalPage = physicalPage
-			foundTOC = true
 			continue
 		}
-
+		
 		// 检查是否是分节符（SectionProperties）
-		if _, ok := element.(*SectionProperties); ok {
+		if sectionProps, ok := element.(*SectionProperties); ok {
 			// 分节符后的第一页
 			physicalPage++
+			
+			// 检查是否设置了起始页码
+			if sectionProps.PageNumType != nil && sectionProps.PageNumType.Start != "" {
+				// 如果设置了起始页码，重置逻辑页码
+				startPage := parseInt(sectionProps.PageNumType.Start)
+				if startPage > 0 {
+					logicalPageNum = startPage
+					pageNumberingStarted = true
+					Debugf("发现分节符设置起始页码: %d (物理页: %d)", startPage, physicalPage)
+				}
+			} else if pageNumberingStarted {
+				// 如果没有设置起始页码，但已经开始页码编号，则递增
+				logicalPageNum++
+			}
 			continue
 		}
-
+		
 		// 检查是否是书签开始标记
 		if bookmarkStart, ok := element.(*BookmarkStart); ok {
 			// 保存当前书签名称，等待后续的标题段落
 			currentBookmarkName = bookmarkStart.Name
 			continue
 		}
-
+		
 		// 检查是否是书签结束标记
 		if _, ok := element.(*BookmarkEnd); ok {
 			// 书签结束，清除当前书签名称
 			currentBookmarkName = ""
 			continue
 		}
-
+		
 		// 检查段落中的分页符和分节符
 		if paragraph, ok := element.(*Paragraph); ok {
-			// 保存标题所在的物理页码（在处理分页符和分节符之前）
-			titlePhysicalPage := physicalPage
-
+			// 保存标题所在的逻辑页码（在处理分页符和分节符之前）
+			//titleLogicalPage := logicalPageNum
+			
 			// 检查是否有分页符
 			if paragraph.Properties != nil && paragraph.Properties.PageBreak != nil {
 				physicalPage++
+				if pageNumberingStarted {
+					logicalPageNum++
+				}
+				Debugf("分页符后物理页: %d, 逻辑页码: %d", physicalPage, logicalPageNum)
 			}
-
+			
 			// 检查是否有分节符
 			if paragraph.Properties != nil && paragraph.Properties.SectionProperties != nil {
+				// 检查是否设置了起始页码
+				hasStartPage := false
+				if paragraph.Properties.SectionProperties.PageNumType != nil &&
+					paragraph.Properties.SectionProperties.PageNumType.Start != "" {
+					startPage := parseInt(paragraph.Properties.SectionProperties.PageNumType.Start)
+					if startPage > 0 {
+						logicalPageNum = startPage
+						pageNumberingStarted = true
+						hasStartPage = true
+						Debugf("发现分节符设置起始页码: %d (物理页: %d, 逻辑页码: %d)", startPage, physicalPage, logicalPageNum)
+					}
+				}
+				
 				// 分节符后的第一页
 				if paragraph.Properties.PageBreak == nil {
 					// 如果没有分页符，分节符后的第一页是当前页的下一页
 					physicalPage++
+					// 只有在没有设置起始页码的情况下，才增加逻辑页码
+					if pageNumberingStarted && !hasStartPage {
+						logicalPageNum++
+					}
+					Debugf("分节符后物理页: %d, 逻辑页码: %d", physicalPage, logicalPageNum)
 				}
 				// 如果有分页符，physicalPage已经在上面更新了
+				// logicalPageNum只有在没有设置起始页码的情况下才增加
 			}
-
+			
 			// 检查是否是标题
 			if paragraph.Properties != nil && paragraph.Properties.ParagraphStyle != nil {
 				styleVal := paragraph.Properties.ParagraphStyle.Val
 				level := 0
-
+				
 				// 根据样式ID判断标题级别
 				switch styleVal {
 				case "Heading1", "1", "2":
@@ -654,7 +690,7 @@ func (d *Document) collectHeadingsWithBookmarks(maxLevel int, skipIndex int) []T
 				case "Heading9", "10":
 					level = 9
 				}
-
+				
 				if level > 0 && level <= maxLevel {
 					// 提取标题文本
 					var textBuilder strings.Builder
@@ -664,51 +700,39 @@ func (d *Document) collectHeadingsWithBookmarks(maxLevel int, skipIndex int) []T
 						}
 					}
 					text := textBuilder.String()
-
+					
 					if text != "" {
-						// 如果标题在目录之前，跳过
-						// 使用动态计算的目录页码，而不是硬编码的3
-						if foundTOC && titlePhysicalPage <= tocPhysicalPage {
-							continue
+						// ============================================================
+						// 页码计算：使用物理页码减去偏移量
+						// ============================================================
+						// 这里使用物理页码减去偏移量作为目录中显示的页码。
+						// 例如：如果物理页码是6，偏移量是5，则目录页码显示为1。
+						// PAGEREF字段仍然存在，可以在Word中更新以获得精确页码。
+						// ============================================================
+						estimatedPage := physicalPage - pageOffset
+						if estimatedPage < 1 {
+							estimatedPage = 1 // 确保页码至少为1
 						}
-
-						// ============================================================
-						// 重要：页码完全依赖PAGEREF字段自动更新，不进行手动计算
-						// ============================================================
-						// Word的页码是基于渲染后的布局动态计算的，包括：
-						// - 字体大小和样式
-						// - 页边距和行距
-						// - 段落间距
-						// - 表格自动分页
-						// - 图片大小和位置
-						// - 内容动态变化（可多可少，标题可能被推到下一页或下下页）
-						// 这些因素在XML层面无法准确预测，因此我们完全依赖PAGEREF字段。
-						// PAGEREF字段会在Word打开文档时自动更新为正确的页码。
-						// 如果Word没有自动更新，用户可以：
-						// 1. 按Ctrl+A全选，然后按F9更新所有字段
-						// 2. 或者右键点击目录，选择"更新域"
-						// ============================================================
-						estimatedPage := 1 // 初始占位值，PAGEREF会自动更新为正确页码
-
+						
 						// 调试输出
-						Debugf("标题: %s, 书签: %s (页码由PAGEREF字段自动计算)",
-							text, currentBookmarkName)
-
+						Debugf("标题: %s, 书签: %s, 物理页: %d, 偏移量: %d, 目录页码: %d",
+							text, currentBookmarkName, physicalPage, pageOffset, estimatedPage)
+						
 						// 使用实际的书签名称（如果存在），否则生成默认的书签ID
 						bookmarkID := currentBookmarkName
 						if bookmarkID == "" {
 							// 如果没有找到书签，生成默认的书签ID
 							bookmarkID = fmt.Sprintf("_Toc_%s", strings.ReplaceAll(text, " ", "_"))
 						}
-
+						
 						entry := TOCEntry{
 							Text:       text,
 							Level:      level,
-							PageNum:    estimatedPage, // 初始值，PAGEREF域会自动更新为正确页码
+							PageNum:    estimatedPage, // 使用逻辑页码
 							BookmarkID: bookmarkID,
 						}
 						entries = append(entries, entry)
-
+						
 						// 清除当前书签名称（已使用）
 						currentBookmarkName = ""
 					}
@@ -716,7 +740,7 @@ func (d *Document) collectHeadingsWithBookmarks(maxLevel int, skipIndex int) []T
 			}
 		}
 	}
-
+	
 	return entries
 }
 
@@ -959,10 +983,11 @@ func (d *Document) createTOCEntryWithFields(entry TOCEntry, config *TOCConfig) *
 		},
 	})
 	
-	// 页码文本（使用占位符，PAGEREF会自动更新为正确页码）
-	// 使用空字符串作为初始值，让Word自动计算
+	// 页码文本（使用计算的页码作为初始值）
+	// 这样可以实现"一步到位"的效果，用户打开文档就能看到正确的页码
+	// PAGEREF字段仍然存在，可以在Word中更新以获得精确页码
 	para.Runs = append(para.Runs, Run{
-		Text: Text{Content: ""},
+		Text: Text{Content: fmt.Sprintf("%d", entry.PageNum)},
 	})
 	
 	// 页码域结束
@@ -1003,11 +1028,11 @@ func generateUniqueID(text string) int {
 // 注意：页码完全依赖PAGEREF字段自动更新
 func (d *Document) collectHeadingsAndAddBookmarks(maxLevel int) []TOCEntry {
 	var entries []TOCEntry
-
+	
 	// 需要一个新的Elements切片来插入书签
 	newElements := make([]interface{}, 0, len(d.Body.Elements)*2)
 	entryIndex := 0
-
+	
 	for _, element := range d.Body.Elements {
 		if paragraph, ok := element.(*Paragraph); ok {
 			level := d.getHeadingLevel(paragraph)
@@ -1016,7 +1041,7 @@ func (d *Document) collectHeadingsAndAddBookmarks(maxLevel int) []TOCEntry {
 				if text != "" {
 					// 为每个条目生成唯一的书签ID（与目录条目中使用的一致）
 					anchor := fmt.Sprintf("_Toc%d", generateUniqueID(text))
-
+					
 					entry := TOCEntry{
 						Text:       text,
 						Level:      level,
@@ -1024,23 +1049,23 @@ func (d *Document) collectHeadingsAndAddBookmarks(maxLevel int) []TOCEntry {
 						BookmarkID: anchor,
 					}
 					entries = append(entries, entry)
-
+					
 					// 在标题段落前添加书签开始标记
 					bookmarkStart := &BookmarkStart{
 						ID:   fmt.Sprintf("%d", entryIndex),
 						Name: anchor,
 					}
 					newElements = append(newElements, bookmarkStart)
-
+					
 					// 添加原段落
 					newElements = append(newElements, element)
-
+					
 					// 在标题段落后添加书签结束标记
 					bookmarkEnd := &BookmarkEnd{
 						ID: fmt.Sprintf("%d", entryIndex),
 					}
 					newElements = append(newElements, bookmarkEnd)
-
+					
 					entryIndex++
 					continue
 				}
@@ -1049,9 +1074,9 @@ func (d *Document) collectHeadingsAndAddBookmarks(maxLevel int) []TOCEntry {
 		// 非标题段落直接添加
 		newElements = append(newElements, element)
 	}
-
+	
 	// 更新文档元素
 	d.Body.Elements = newElements
-
+	
 	return entries
 }
