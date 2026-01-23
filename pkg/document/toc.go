@@ -587,7 +587,7 @@ func (d *Document) collectHeadingsWithBookmarks(maxLevel int, skipIndex int, pag
 	// 初始化状态
 	currentY := 0.0           // 当前页面已用高度 (磅)
 	currentPage := 1          // 物理页码 (从1开始)
-	displayPage := 1          // 显示页码 (考虑起始页码设置)
+	displayPage := 0          // 显示页码 (考虑起始页码设置，初始为0表示无页码)
 
 	// 目录页码偏移修正：如果PageOffset>0，则逻辑页码从1-PageOffset开始
 	if pageOffset > 0 {
@@ -651,7 +651,10 @@ func (d *Document) collectHeadingsWithBookmarks(maxLevel int, skipIndex int, pag
 					Debugf("忽略紧跟分节符的分页符: %s, Page 保持 %d", d.extractParagraphText(paragraph), displayPage)
 					ignoreNextPageBreak = false
 				} else {
-					displayPage++
+					// 只有当displayPage > 0时才增加页码（表示已经进入有页码的节）
+					if displayPage > 0 {
+						displayPage++
+					}
 					Debugf("发现分页符: %s, Page -> %d", d.extractParagraphText(paragraph), displayPage)
 				}
 			} else {
@@ -694,7 +697,10 @@ func (d *Document) collectHeadingsWithBookmarks(maxLevel int, skipIndex int, pag
 				if currentY+elementHeight > contentHeightPt {
 					// 自动分页
 					currentPage++
-					displayPage++
+					// 只有当displayPage > 0时才增加页码（表示已经进入有页码的节）
+					if displayPage > 0 {
+						displayPage++
+					}
 					currentY = elementHeight
 				} else {
 					currentY += elementHeight
@@ -755,7 +761,10 @@ func (d *Document) collectHeadingsWithBookmarks(maxLevel int, skipIndex int, pag
 				
 				if currentY+rowHeight > contentHeightPt {
 					currentPage++
-					displayPage++
+					// 只有当displayPage > 0时才增加页码（表示已经进入有页码的节）
+					if displayPage > 0 {
+						displayPage++
+					}
 					currentY = rowHeight
 				} else {
 					currentY += rowHeight
@@ -767,7 +776,10 @@ func (d *Document) collectHeadingsWithBookmarks(maxLevel int, skipIndex int, pag
 		// 普通段落（非分节符）的高度处理
 		if currentY+elementHeight > contentHeightPt {
 			currentPage++
-			displayPage++
+			// 只有当displayPage > 0时才增加页码（表示已经进入有页码的节）
+			if displayPage > 0 {
+				displayPage++
+			}
 			currentY = elementHeight
 		} else {
 			currentY += elementHeight
