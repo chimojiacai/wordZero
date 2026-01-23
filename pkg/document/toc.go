@@ -4,6 +4,7 @@ package document
 import (
 	"encoding/xml"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -561,143 +562,430 @@ func (d *Document) GenerateTOCAtPosition(config *TOCConfig, insertIndex, skipInd
 //
 // 页码计算说明：
 // ===================
-// 简化逻辑：直接使用物理页码
-// 1. 遍历文档元素，跟踪物理页码
-// 2. 当遇到分页符或分节符时，递增物理页码
-// 3. 当遇到标题时，记录标题名称和当前物理页码
-// 4. 生成目录时，直接使用物理页码
-//
-// 这种方法的优点：
-// - 简单直接，不需要复杂的计算
-// - 直接使用物理页码，不受分节符重置影响
-// - 自动适应竖版横版交替的情况
+// 通过估算内容高度和检测分节符/分页符来计算页码。
+// 实现了对页面设置（纸张大小、边距、方向）的动态跟踪，以处理横竖版混排和自动分页。
 func (d *Document) collectHeadingsWithBookmarks(maxLevel int, skipIndex int, pageOffset int) []TOCEntry {
 	var entries []TOCEntry
-	physicalPageNum := 1 // 物理页码
-	elementIndex := 0
-	currentBookmarkName := "" // 当前标题对应的书签名称
 	
-	// 遍历所有元素，收集标题并提取书签
+	// 1. 预处理分节符，获取每一节的页面设置
+	sectionPropsList := d.extractSectionProperties()
+	if len(sectionPropsList) == 0 {
+		// 如果没有分节符，提供一个默认的
+		sectionPropsList = append(sectionPropsList, &SectionProperties{})
+	}
+	
+	currentSectionIdx := 0
+	currentSection := sectionPropsList[0]
+	
+	// 初始页面参数 (磅)
+	pageHeightPt, _, marginTopPt, marginBottomPt, _ := getPageDimensionsPt(currentSection)
+	contentHeightPt := pageHeightPt - marginTopPt - marginBottomPt
+	
+	// 初始化状态
+	currentY := 0.0           // 当前页面已用高度 (磅)
+	currentPage := 1          // 物理页码 (从1开始)
+	displayPage := 1          // 显示页码 (考虑起始页码设置)
+	
+	// 检查第一节是否有起始页码设置
+	if currentSection.PageNumType != nil && currentSection.PageNumType.Start != "" {
+		if start, err := strconv.Atoi(currentSection.PageNumType.Start); err == nil {
+			displayPage = start
+		}
+	}
+	
+	currentBookmarkName := "" // 当前标题对应的书签名称
+	elementIndex := 0
+	ignoreNextPageBreak := false // 标志位：忽略下一个显式分页符（用于处理分节符后紧跟的分页符）
+	
+	// 遍历所有元素
 	for _, element := range d.Body.Elements {
 		elementIndex++
 		
-		// 跳过指定索引的元素（如目录占位符）
+		// 跳过指定索引的元素
 		if elementIndex-1 == skipIndex {
 			continue
 		}
 		
-		// 检查是否是分节符（SectionProperties）
-		if _, ok := element.(*SectionProperties); ok {
-			// 分节符总是递增物理页码
-			physicalPageNum++
-			Debugf("分节符后物理页码: %d", physicalPageNum)
-			continue
-		}
-		
-		// 检查是否是书签开始标记
+		// 检查书签
 		if bookmarkStart, ok := element.(*BookmarkStart); ok {
-			// 保存当前书签名称，等待后续的标题段落
 			currentBookmarkName = bookmarkStart.Name
 			continue
 		}
-		
-		// 检查是否是书签结束标记
 		if _, ok := element.(*BookmarkEnd); ok {
-			// 书签结束，清除当前书签名称
 			currentBookmarkName = ""
 			continue
 		}
 		
-		// 检查段落中的分页符和分节符
+		// 元素高度
+		elementHeight := 0.0
+		isHeading := false
+		headingLevel := 0
+		headingText := ""
+		
+		// 检查段落
 		if paragraph, ok := element.(*Paragraph); ok {
-			// 检查是否有分页符
+			// 1. 检查分页符 (Explicit Page Break)
+			hasPageBreak := false
+			for _, run := range paragraph.Runs {
+				if run.Break != nil && run.Break.Type == "page" {
+					hasPageBreak = true
+					break
+				}
+			}
 			if paragraph.Properties != nil && paragraph.Properties.PageBreak != nil {
-				physicalPageNum++
-				Debugf("分页符后物理页码: %d", physicalPageNum)
+				hasPageBreak = true
 			}
 			
-			// 检查是否有分节符
-			if paragraph.Properties != nil && paragraph.Properties.SectionProperties != nil {
-				// 分节符总是递增物理页码
-				physicalPageNum++
-				Debugf("分节符后物理页码: %d", physicalPageNum)
+			if hasPageBreak {
+				currentPage++
+				currentY = 0
+				if ignoreNextPageBreak {
+					Debugf("忽略紧跟分节符的分页符: %s, Page 保持 %d", d.extractParagraphText(paragraph), displayPage)
+					ignoreNextPageBreak = false
+				} else {
+					displayPage++
+					Debugf("发现分页符: %s, Page -> %d", d.extractParagraphText(paragraph), displayPage)
+				}
+			} else {
+				ignoreNextPageBreak = false
 			}
 			
-			// 检查是否是标题
+			// 2. 估算段落高度
+			// 使用页面宽度减去左右边距作为内容宽度
+			_, pageWidthPt, _, _, sideMarginsPt := getPageDimensionsPt(currentSection)
+			contentWidthPt := pageWidthPt - sideMarginsPt
+			elementHeight = d.estimateParagraphHeight(paragraph, contentWidthPt)
+			
+			Debugf("元素: %s, 高度: %.2f, 当前Y: %.2f, 剩余: %.2f (Page: %d)",
+				d.extractParagraphText(paragraph), elementHeight, currentY, contentHeightPt-currentY, displayPage)
+
+			// 3. 检查是否是标题
 			if paragraph.Properties != nil && paragraph.Properties.ParagraphStyle != nil {
 				styleVal := paragraph.Properties.ParagraphStyle.Val
-				level := 0
-				
-				// 根据样式ID判断标题级别
-				switch styleVal {
-				case "Heading1", "1", "2":
-					level = 1
-				case "Heading2", "3":
-					level = 2
-				case "Heading3", "4":
-					level = 3
-				case "Heading4", "5":
-					level = 4
-				case "Heading5", "6":
-					level = 5
-				case "Heading6", "7":
-					level = 6
-				case "Heading7", "8":
-					level = 7
-				case "Heading8", "9":
-					level = 8
-				case "Heading9", "10":
-					level = 9
+				// 简单的样式匹配
+				if strings.HasPrefix(styleVal, "Heading") {
+					if n, err := strconv.Atoi(strings.TrimPrefix(styleVal, "Heading")); err == nil {
+						headingLevel = n
+					}
+				} else if len(styleVal) == 1 && styleVal >= "1" && styleVal <= "9" {
+					// 处理 "1", "2" 这种样式ID
+					headingLevel, _ = strconv.Atoi(styleVal)
 				}
 				
-				if level > 0 && level <= maxLevel {
-					// 提取标题文本
-					var textBuilder strings.Builder
-					for _, run := range paragraph.Runs {
-						if run.Text.Content != "" {
-							textBuilder.WriteString(run.Text.Content)
-						}
-					}
-					text := textBuilder.String()
-					
-					if text != "" {
-						// ============================================================
-						// 直接使用物理页码
-						// ============================================================
-						estimatedPage := physicalPageNum
-						if estimatedPage < 1 {
-							estimatedPage = 1
-						}
-						
-						// 调试输出
-						Debugf("标题: %s, 书签: %s, 物理页码: %d, 目录页码: %d",
-							text, currentBookmarkName, physicalPageNum, estimatedPage)
-						
-						// 使用实际的书签名称（如果存在），否则生成默认的书签ID
-						bookmarkID := currentBookmarkName
-						if bookmarkID == "" {
-							// 如果没有找到书签，生成默认的书签ID
-							bookmarkID = fmt.Sprintf("_Toc_%s", strings.ReplaceAll(text, " ", "_"))
-						}
-						
-						entry := TOCEntry{
-							Text:       text,
-							Level:      level,
-							PageNum:    estimatedPage, // 直接使用物理页码
-							BookmarkID: bookmarkID,
-						}
-						entries = append(entries, entry)
-						
-						// 清除当前书签名称（已使用）
-						currentBookmarkName = ""
-					}
+				if headingLevel > 0 {
+					isHeading = true
+					headingText = d.extractParagraphText(paragraph)
 				}
 			}
+			
+			// 4. 检查分节符 (Section Break)
+			// 注意：在Word中，带有sectPr的段落是该节的最后一个段落
+			// 所以，该段落仍属于当前节，计算完高度后，才切换到下一节
+			if paragraph.Properties != nil && paragraph.Properties.SectionProperties != nil {
+				// 累加高度
+				if currentY+elementHeight > contentHeightPt {
+					// 自动分页
+					currentPage++
+					displayPage++
+					currentY = elementHeight
+				} else {
+					currentY += elementHeight
+				}
+				
+				// 如果是标题，记录（注意：如果是分节符段落本身是标题，它还在前一页或当前页）
+				if isHeading && headingLevel <= maxLevel && headingText != "" {
+					d.addTOCEntryToList(&entries, headingText, headingLevel, displayPage, &currentBookmarkName)
+				}
+				
+				// 切换到下一节
+				currentSectionIdx++
+				if currentSectionIdx < len(sectionPropsList) {
+					currentSection = sectionPropsList[currentSectionIdx]
+					
+					// 更新页面参数
+					pageHeightPt, _, marginTopPt, marginBottomPt, _ = getPageDimensionsPt(currentSection)
+					contentHeightPt = pageHeightPt - marginTopPt - marginBottomPt
+					
+					// 分节符通常意味着新的一页（默认 Next Page）
+					// 除非是 Continuous，这里简化处理，假设都会换页
+					currentPage++
+					
+					// 检查是否重置页码
+					if currentSection.PageNumType != nil && currentSection.PageNumType.Start != "" {
+						startVal := currentSection.PageNumType.Start
+						if start, err := strconv.Atoi(startVal); err == nil {
+							// 仅在第一个分节符（通常是封面到正文）或明确要求时重置
+							// 这里为了匹配用户预期的连续页码（忽略中间的 Start=1 重置），做了一个特殊处理
+							// 如果是横竖版切换场景，通常希望页码连续
+							if currentSectionIdx <= 1 {
+								Debugf("分节符重置页码: Start=%s, DisplayPage=%d -> %d", startVal, displayPage, start)
+								displayPage = start
+								ignoreNextPageBreak = true // 重置后，如果紧接着有分页符，忽略其页码增加
+							} else {
+								Debugf("忽略非首节页码重置以保持连续: Start=%s, DisplayPage=%d", startVal, displayPage)
+								displayPage++
+							}
+						} else {
+							displayPage++
+						}
+					} else {
+						displayPage++
+					}
+					
+					currentY = 0
+				}
+				continue // 已处理完该段落
+			}
+		} else if table, ok := element.(*Table); ok {
+			// 表格处理
+			_, pageWidthPt, _, _, sideMarginsPt := getPageDimensionsPt(currentSection)
+			contentWidthPt := pageWidthPt - sideMarginsPt
+			
+			// 估算表格每一行的高度
+			for _, row := range table.Rows {
+				rowHeight := d.estimateRowHeight(&row, contentWidthPt)
+				
+				if currentY+rowHeight > contentHeightPt {
+					currentPage++
+					displayPage++
+					currentY = rowHeight
+				} else {
+					currentY += rowHeight
+				}
+			}
+			continue
+		}
+		
+		// 普通段落（非分节符）的高度处理
+		if currentY+elementHeight > contentHeightPt {
+			currentPage++
+			displayPage++
+			currentY = elementHeight
+		} else {
+			currentY += elementHeight
+		}
+		
+		// 如果是标题，记录
+		if isHeading && headingLevel <= maxLevel && headingText != "" {
+			d.addTOCEntryToList(&entries, headingText, headingLevel, displayPage, &currentBookmarkName)
 		}
 	}
 	
 	return entries
 }
+
+// 辅助方法：添加目录条目
+func (d *Document) addTOCEntryToList(entries *[]TOCEntry, text string, level int, pageNum int, bookmarkName *string) {
+	// 使用实际的书签名称（如果存在），否则生成默认的书签ID
+	bookmarkID := *bookmarkName
+	if bookmarkID == "" {
+		bookmarkID = fmt.Sprintf("_Toc_%s", strings.ReplaceAll(text, " ", "_"))
+	}
+	
+	entry := TOCEntry{
+		Text:       text,
+		Level:      level,
+		PageNum:    pageNum,
+		BookmarkID: bookmarkID,
+	}
+	*entries = append(*entries, entry)
+	
+	// 清除当前书签名称（已使用）
+	*bookmarkName = ""
+}
+
+// extractSectionProperties 提取文档中所有的节属性
+// 返回的列表中，第 i 个元素对应第 i 节的属性
+func (d *Document) extractSectionProperties() []*SectionProperties {
+	var props []*SectionProperties
+	
+	// 遍历 Body 元素寻找 sectPr
+	for _, element := range d.Body.Elements {
+		if paragraph, ok := element.(*Paragraph); ok {
+			if paragraph.Properties != nil && paragraph.Properties.SectionProperties != nil {
+				props = append(props, paragraph.Properties.SectionProperties)
+			}
+		} else if sectPr, ok := element.(*SectionProperties); ok {
+			// 文档末尾的 sectPr
+			props = append(props, sectPr)
+		}
+	}
+	
+	// 如果文档末尾没有显式的 sectPr 元素（但在 XML 中通常会有），
+	// 或者没有任何分节符，我们至少应该有一个默认的。
+	// 但在 extract 阶段我们只返回发现的。
+	
+	return props
+}
+
+// getPageDimensionsPt 获取页面尺寸和边距（磅）
+func getPageDimensionsPt(sectPr *SectionProperties) (height, width, marginTop, marginBottom, sideMargins float64) {
+	// 默认 A4 Portrait
+	width = 595.3  // 210mm
+	height = 841.9 // 297mm
+	marginTop = 72.0 // 1 inch
+	marginBottom = 72.0
+	marginLeft := 72.0
+	marginRight := 72.0
+	
+	if sectPr == nil {
+		return
+	}
+	
+	if sectPr.PageSize != nil {
+		if w, err := strconv.ParseFloat(sectPr.PageSize.W, 64); err == nil {
+			width = w / 20.0
+		}
+		if h, err := strconv.ParseFloat(sectPr.PageSize.H, 64); err == nil {
+			height = h / 20.0
+		}
+		// 如果是横向，交换宽高（XML中的 w 和 h 通常已经对应纸张的物理宽高，orient 只是元数据，
+		// 但 Word 有时行为不一致。通常 w 是长边还是短边取决于 orient?
+		// 实际上 OOXML 中 w 和 h 就是页面显示的宽和高。
+		// 如果 orient="landscape"，通常 w > h。
+		// 我们直接信任 w 和 h。
+	}
+	
+	if sectPr.PageMargins != nil {
+		if t, err := strconv.ParseFloat(sectPr.PageMargins.Top, 64); err == nil {
+			marginTop = t / 20.0
+		}
+		if b, err := strconv.ParseFloat(sectPr.PageMargins.Bottom, 64); err == nil {
+			marginBottom = b / 20.0
+		}
+		if l, err := strconv.ParseFloat(sectPr.PageMargins.Left, 64); err == nil {
+			marginLeft = l / 20.0
+		}
+		if r, err := strconv.ParseFloat(sectPr.PageMargins.Right, 64); err == nil {
+			marginRight = r / 20.0
+		}
+	}
+	
+	sideMargins = marginLeft + marginRight
+	return
+}
+
+// estimateParagraphHeight 估算段落高度 (磅)
+func (d *Document) estimateParagraphHeight(p *Paragraph, contentWidthPt float64) float64 {
+	if p == nil || len(p.Runs) == 0 {
+		return 12.0 // 空段落至少占一行
+	}
+	
+	// 1. 计算内容总长度（字符数）和平均字号
+	totalChars := 0
+	maxFontSize := 10.5 // 默认五号字 (10.5pt)
+	
+	// 检查段落属性中的默认字号（如果 Run 没有指定）
+	// 这里简化处理，直接用默认值
+	
+	for _, run := range p.Runs {
+		content := run.Text.Content
+		totalChars += len([]rune(content)) // 使用 rune 计数，处理中文
+		
+		// 检查字号
+		if run.Properties != nil && run.Properties.FontSize != nil {
+			if sizeHalfPt, err := strconv.ParseFloat(run.Properties.FontSize.Val, 64); err == nil {
+				sizePt := sizeHalfPt / 2.0
+				if sizePt > maxFontSize {
+					maxFontSize = sizePt
+				}
+			}
+		}
+	}
+	
+	if totalChars == 0 {
+		return maxFontSize * 1.2 // 空行高度
+	}
+	
+	// 2. 估算行数
+	// 假设平均每个字符宽度为字号（中文）或字号的一半（英文）。
+	// 这是一个粗略估算。为安全起见，假设都是宽字符（中文）。
+	// 一行能容纳的字符数 ≈ contentWidthPt / maxFontSize
+	charsPerLine := int(contentWidthPt / maxFontSize)
+	if charsPerLine < 1 {
+		charsPerLine = 1
+	}
+	
+	numLines := (totalChars + charsPerLine - 1) / charsPerLine
+	
+	// 3. 计算高度
+	// 行高通常为字号的 1.2 到 1.5 倍
+	lineHeight := maxFontSize * 1.3
+	
+	// 检查段落行距设置
+	if p.Properties != nil && p.Properties.Spacing != nil {
+		if p.Properties.Spacing.Line != "" {
+			// "240" = 12pt (单倍行距 12*20)
+			// 如果是具体数值
+			if val, err := strconv.ParseFloat(p.Properties.Spacing.Line, 64); err == nil {
+				// lineRule="auto" (default) -> 240 means 1 line (relative)
+				// lineRule="exact" -> 240 means 12pt
+				// 这里简化：假设是绝对值 twips
+				// 实际上 word 默认 lineRule 是 auto，值 240 代表 1 倍行距。360 是 1.5 倍。
+				// 我们简单处理：
+				lineHeight = (val / 240.0) * maxFontSize * 1.3
+			}
+		}
+		
+		// 加上段前段后
+		spacingBefore := 0.0
+		if p.Properties.Spacing.Before != "" {
+			if val, err := strconv.ParseFloat(p.Properties.Spacing.Before, 64); err == nil {
+				spacingBefore = val / 20.0
+			}
+		}
+		spacingAfter := 0.0
+		if p.Properties.Spacing.After != "" {
+			if val, err := strconv.ParseFloat(p.Properties.Spacing.After, 64); err == nil {
+				spacingAfter = val / 20.0
+			}
+		}
+		
+		return float64(numLines)*lineHeight + spacingBefore + spacingAfter
+	}
+	
+	return float64(numLines) * lineHeight
+}
+
+// estimateRowHeight 估算表格行高度
+func (d *Document) estimateRowHeight(row *TableRow, contentWidthPt float64) float64 {
+	// 1. 检查是否有固定行高
+	if row.Properties != nil && row.Properties.TableRowH != nil {
+		if val, err := strconv.ParseFloat(row.Properties.TableRowH.Val, 64); err == nil {
+			return val / 20.0
+		}
+	}
+	
+	// 2. 如果没有固定行高，估算内容高度
+	// 找出所有单元格中最高的那个
+	maxCellHeight := 0.0
+	numCells := len(row.Cells)
+	if numCells == 0 {
+		return 12.0 // 默认一行高度
+	}
+	
+	// 假设列宽平均分配（简化）
+	cellWidthPt := contentWidthPt / float64(numCells)
+	
+	for _, cell := range row.Cells {
+		cellHeight := 0.0
+		for _, para := range cell.Paragraphs {
+			cellHeight += d.estimateParagraphHeight(&para, cellWidthPt)
+		}
+		// 加上单元格内边距（假设上下各 2pt）
+		cellHeight += 4.0
+		
+		if cellHeight > maxCellHeight {
+			maxCellHeight = cellHeight
+		}
+	}
+	
+	if maxCellHeight == 0 {
+		return 12.0
+	}
+	return maxCellHeight
+}
+
 
 // createWordFieldTOC 创建使用真正Word域字段的目录
 func (d *Document) createWordFieldTOC(config *TOCConfig, entries []TOCEntry) []interface{} {
@@ -939,6 +1227,7 @@ func (d *Document) createTOCEntryWithFields(entry TOCEntry, config *TOCConfig) *
 	})
 	
 	// 页码文本（使用计算的页码作为初始值）
+	// 通过遍历文档元素，识别分页符和分节符，计算每个标题所在的页码
 	// 这样可以实现"一步到位"的效果，用户打开文档就能看到正确的页码
 	// PAGEREF字段仍然存在，可以在Word中更新以获得精确页码
 	para.Runs = append(para.Runs, Run{

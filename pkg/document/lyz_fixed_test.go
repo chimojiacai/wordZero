@@ -39,7 +39,7 @@ func TestHeaderStyleFixed(t *testing.T) {
 		Bold:       true,
 	}
 	reportExplain(doc, textFormat, &SpacingConfig{})
-	reportExplain(doc, textFormat, &SpacingConfig{})
+	//reportExplain(doc, textFormat, &SpacingConfig{})
 	
 	doc.AddParagraph("").AddPageBreak()
 	
@@ -385,7 +385,7 @@ func TestHeaderStyleFixed(t *testing.T) {
 		RightAlign:   true,
 		UseHyperlink: true,
 		DotLeader:    true,
-		PageOffset:   4, // 过滤掉封面、目录、第1-4页（共6页）
+		PageOffset:   0, // 过滤掉封面、目录、第1-4页（共6页）
 	}
 	
 	// 调用toc.go中的方法生成目录
