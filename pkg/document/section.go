@@ -76,6 +76,8 @@ func (p *Paragraph) AddSectionBreakWithStartPage(orient PageOrientation, doc *Do
 			Bottom:  fmt.Sprintf("%.0f", mmToTwips(doc.GetPageSettings().MarginBottom)),
 			Left:    fmt.Sprintf("%.0f", mmToTwips(doc.GetPageSettings().MarginLeft)),
 			Right:   fmt.Sprintf("%.0f", mmToTwips(doc.GetPageSettings().MarginRight)),
+			Header:  fmt.Sprintf("%.0f", mmToTwips(doc.GetPageSettings().HeaderDistance)),
+			Footer:  fmt.Sprintf("%.0f", mmToTwips(doc.GetPageSettings().FooterDistance)),
 		},
 		TitlePage: existingSectPr.TitlePage,
 		XmlnsR:    existingSectPr.XmlnsR,
@@ -146,6 +148,17 @@ func (p *Paragraph) AddSectionBreakWithStartPage(orient PageOrientation, doc *Do
 		nextSectPr.PageSize.W = "11906"
 		nextSectPr.PageSize.H = "16838"
 	}
+
+	// 更新新节的页面边距（包括页眉页脚距离）
+	if nextSectPr.PageMargins == nil {
+		nextSectPr.PageMargins = &PageMargin{}
+	}
+	nextSectPr.PageMargins.Top = fmt.Sprintf("%.0f", mmToTwips(doc.GetPageSettings().MarginTop))
+	nextSectPr.PageMargins.Bottom = fmt.Sprintf("%.0f", mmToTwips(doc.GetPageSettings().MarginBottom))
+	nextSectPr.PageMargins.Left = fmt.Sprintf("%.0f", mmToTwips(doc.GetPageSettings().MarginLeft))
+	nextSectPr.PageMargins.Right = fmt.Sprintf("%.0f", mmToTwips(doc.GetPageSettings().MarginRight))
+	nextSectPr.PageMargins.Header = fmt.Sprintf("%.0f", mmToTwips(doc.GetPageSettings().HeaderDistance))
+	nextSectPr.PageMargins.Footer = fmt.Sprintf("%.0f", mmToTwips(doc.GetPageSettings().FooterDistance))
 
 	// 更新新节的页码设置
 	nextSectPr.PageNumType = &PageNumType{
