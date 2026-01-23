@@ -376,6 +376,67 @@ func TestHeaderStyleFixed(t *testing.T) {
 		contentPara6.Runs[0].Properties.FontSize = &FontSize{Val: "24"}
 		contentPara6.Runs[0].Properties.Color = &Color{Val: "000000"}
 	}
+
+	// ---------------- 新增内容 start ----------------
+
+	// 1. 切换到横版
+	contentPara6.AddPageBreak()
+	contentPara6.SetSpacing(&SpacingConfig{BeforePara: 0, AfterPara: 0})
+	contentPara6.AddSectionBreakWithStartPage(OrientationLandscape, doc, 0, true)
+
+	// 第八页：横版图片展示
+	bookmarkName8 := "_Toc_第八页_横版图片"
+	p8 := doc.AddHeadingParagraphWithBookmark("第八页：横版图片展示", 1, bookmarkName8)
+	if len(p8.Runs) > 0 {
+		if p8.Runs[0].Properties == nil {
+			p8.Runs[0].Properties = &RunProperties{}
+		}
+		p8.Runs[0].Properties.FontFamily = &FontFamily{ASCII: "SimSun", HAnsi: "SimSun", EastAsia: "SimSun"}
+		p8.Runs[0].Properties.FontSize = &FontSize{Val: "28"}
+		p8.Runs[0].Properties.Color = &Color{Val: "000000"}
+		p8.Runs[0].Properties.Bold = &Bold{}
+	}
+
+	doc.AddParagraph("这里展示横版页面下的图片：")
+	
+	// 插入图片
+	imgConfig := &ImageConfig{
+		Size: &ImageSize{
+			Width:  150, // 宽150mm
+			Height: 100, // 高100mm
+			KeepAspectRatio: true,
+		},
+		Position: ImagePositionInline,
+		Alignment: AlignCenter,
+	}
+	// 尝试加载当前目录下的测试图片
+	_, err = doc.AddImageFromFile("img.png", imgConfig)
+	if err != nil {
+		t.Logf("警告：无法加载 img.png，跳过图片插入测试: %v", err)
+		// 如果图片不存在，加个占位符
+		doc.AddParagraph("[图片占位符：img.png 加载失败]")
+	}
+
+	// 2. 切换回竖版
+	paraImgEnd := doc.AddParagraph("")
+	paraImgEnd.AddSectionBreakWithStartPage(OrientationPortrait, doc, 0, true)
+
+	// 第九页：回归竖版
+	bookmarkName9 := "_Toc_第九页_回归竖版"
+	p9 := doc.AddHeadingParagraphWithBookmark("第九页：回归竖版", 1, bookmarkName9)
+	if len(p9.Runs) > 0 {
+		if p9.Runs[0].Properties == nil {
+			p9.Runs[0].Properties = &RunProperties{}
+		}
+		p9.Runs[0].Properties.FontFamily = &FontFamily{ASCII: "SimSun", HAnsi: "SimSun", EastAsia: "SimSun"}
+		p9.Runs[0].Properties.FontSize = &FontSize{Val: "28"}
+		p9.Runs[0].Properties.Color = &Color{Val: "000000"}
+		p9.Runs[0].Properties.Bold = &Bold{}
+	}
+	
+	doc.AddParagraph("这是第九页，页面方向已切回竖版，页码应继续连续编号。")
+
+	// ---------------- 新增内容 end ----------------
 	
 	// 在目录页位置生成目录
 	tocConfig := &TOCConfig{
@@ -405,5 +466,7 @@ func TestHeaderStyleFixed(t *testing.T) {
 	t.Logf("  - 封面、目录、第1-4页不显示页码")
 	t.Logf("  - 从第5页开始显示页码，页码从1开始")
 	t.Logf("  - 竖版和横版页面交替，页码连续：1, 2, 3, ...")
+	t.Logf("  - 第八页为横版，包含图片")
+	t.Logf("  - 第九页切回竖版")
 	t.Logf("提示：打开Word文档后，按Ctrl+A全选，然后按F9更新所有字段，即可更新目录页码")
 }
