@@ -521,6 +521,9 @@ func (d *Document) GenerateTOCAtPosition(config *TOCConfig, insertIndex, skipInd
 	// 收集标题信息，提取实际的书签名称
 	entries := d.collectHeadingsWithBookmarks(config.MaxLevel, skipIndex, config.PageOffset)
 	
+	// 收集标题信息，提取实际的书签名称
+	entries = d.collectHeadingsWithBookmarks(config.MaxLevel, skipIndex, config.PageOffset)
+	
 	if len(entries) == 0 {
 		return fmt.Errorf("未找到标题")
 	}
@@ -585,7 +588,12 @@ func (d *Document) collectHeadingsWithBookmarks(maxLevel int, skipIndex int, pag
 	currentY := 0.0           // 当前页面已用高度 (磅)
 	currentPage := 1          // 物理页码 (从1开始)
 	displayPage := 1          // 显示页码 (考虑起始页码设置)
-	
+
+	// 目录页码偏移修正：如果PageOffset>0，则逻辑页码从1-PageOffset开始
+	if pageOffset > 0 {
+		displayPage = 1 - pageOffset
+	}
+
 	// 检查第一节是否有起始页码设置
 	if currentSection.PageNumType != nil && currentSection.PageNumType.Start != "" {
 		if start, err := strconv.Atoi(currentSection.PageNumType.Start); err == nil {
@@ -658,7 +666,7 @@ func (d *Document) collectHeadingsWithBookmarks(maxLevel int, skipIndex int, pag
 			
 			Debugf("元素: %s, 高度: %.2f, 当前Y: %.2f, 剩余: %.2f (Page: %d)",
 				d.extractParagraphText(paragraph), elementHeight, currentY, contentHeightPt-currentY, displayPage)
-
+			
 			// 3. 检查是否是标题
 			if paragraph.Properties != nil && paragraph.Properties.ParagraphStyle != nil {
 				styleVal := paragraph.Properties.ParagraphStyle.Val
@@ -821,8 +829,8 @@ func (d *Document) extractSectionProperties() []*SectionProperties {
 // getPageDimensionsPt 获取页面尺寸和边距（磅）
 func getPageDimensionsPt(sectPr *SectionProperties) (height, width, marginTop, marginBottom, sideMargins float64) {
 	// 默认 A4 Portrait
-	width = 595.3  // 210mm
-	height = 841.9 // 297mm
+	width = 595.3    // 210mm
+	height = 841.9   // 297mm
 	marginTop = 72.0 // 1 inch
 	marginBottom = 72.0
 	marginLeft := 72.0
@@ -985,7 +993,6 @@ func (d *Document) estimateRowHeight(row *TableRow, contentWidthPt float64) floa
 	}
 	return maxCellHeight
 }
-
 
 // createWordFieldTOC 创建使用真正Word域字段的目录
 func (d *Document) createWordFieldTOC(config *TOCConfig, entries []TOCEntry) []interface{} {

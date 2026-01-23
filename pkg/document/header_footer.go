@@ -165,7 +165,7 @@ func createPageNumberRuns() []Run {
 		},
 		{
 			Text: Text{
-				Content: "1",
+				Content: "",
 				Space:   "preserve",
 			},
 		},
@@ -574,10 +574,9 @@ func (d *Document) getSectionPropertiesForHeaderFooter() *SectionProperties {
 
 // getCurrentSectionProperties 获取当前活动的节属性（用于页眉页脚）
 func (d *Document) getCurrentSectionProperties() *SectionProperties {
-	// 从后往前查找最新的节属性
+	// 1. 优先查找文档末尾的节属性（这控制的是最后一节，即当前正在编辑的节）
 	for i := len(d.Body.Elements) - 1; i >= 0; i-- {
-		if para, ok := d.Body.Elements[i].(*Paragraph); ok && para.Properties != nil && para.Properties.SectionProperties != nil {
-			sectPr := para.Properties.SectionProperties
+		if sectPr, ok := d.Body.Elements[i].(*SectionProperties); ok {
 			// 确保设置了关系命名空间
 			if sectPr.XmlnsR == "" {
 				sectPr.XmlnsR = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
@@ -586,18 +585,8 @@ func (d *Document) getCurrentSectionProperties() *SectionProperties {
 		}
 	}
 
-	// 如果段落中没找到节属性，则返回文档末尾的节属性
-	for _, element := range d.Body.Elements {
-		if sectPr, ok := element.(*SectionProperties); ok {
-			// 确保设置了关系命名空间
-			if sectPr.XmlnsR == "" {
-				sectPr.XmlnsR = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
-			}
-			return sectPr
-		}
-	}
-
-	// 如果都没有找到，创建新的节属性
+	// 2. 如果文档末尾没有节属性，创建一个并添加到文档末尾
+	// 这样可以确保我们总是操作当前节（最后一节）的属性
 	sectPr := &SectionProperties{
 		XMLName: xml.Name{Local: "w:sectPr"},
 		XmlnsR:  "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
@@ -609,6 +598,7 @@ func (d *Document) getCurrentSectionProperties() *SectionProperties {
 			Num:   "1",
 		},
 	}
+	d.Body.Elements = append(d.Body.Elements, sectPr)
 	return sectPr
 }
 

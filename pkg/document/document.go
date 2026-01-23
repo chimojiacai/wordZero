@@ -65,9 +65,202 @@ func (b *Body) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 
 	// 如果有分节符，确保文档末尾的SectionProperties没有页眉页脚引用
 	// 这样分节符之前的内容（封面、目录等）就不会显示页眉页脚
+	// 但如果最后一个节有页眉页脚，不应该被清除
+	// 正确逻辑：
+	// 1. 如果有分节符，说明文档分成了多个节。
+	// 2. 最后一个SectionProperties控制的是最后一个分节符之后的内容。
+	// 3. 如果最后一个节需要页眉页脚（比如它继承了前面的，或者设置了新的），则应该保留。
+	// 4. 但如果是为了不显示页眉页脚（比如封面），则应该清除。
+	//
+	// 目前的问题是：当设置了分节符后，TestHeaderStyleFixed测试中封面页（第一节）不应该有页眉页脚。
+	// Word中，每一节的属性定义在节的末尾。
+	// 第1节的属性定义在第1个分节符中。
+	// 第2节的属性定义在第2个分节符中。
+	// ...
+	// 最后一节的属性定义在文档末尾的sectPr中。
+	//
+	// 所以，如果要在第2节开始显示页码（即第1个分节符之后），那么：
+	// 第1个分节符（控制第1节）应该没有页眉页脚引用。
+	// 第2个分节符（控制第2节）应该有页眉页脚引用。
+	//
+	// 代码中，sectPr是文档末尾的属性，控制的是最后一节。
+	// 如果最后一节需要显示页码，sectPr必须包含引用。
+	// 如果由于某种原因（例如为了防止封面显示页码）在这里清除了sectPr的引用，
+	// 那么如果最后一节正好是需要显示页码的节，就会导致页码丢失。
+	//
+	// 这里的逻辑似乎是假设“如果有分节符，那么文档末尾的sectPr一定是属于不需要页眉页脚的部分（比如封面位于文档末尾？）”
+	// 这显然是不对的。封面通常在文档开头。
+	//
+	// 如果 hasSectionBreak 为 true，意味着文档中间有分节符。
+	// 此时 sectPr 控制的是 最后一个分节符之后 的内容。
+	// 如果这一部分内容需要页眉页脚，就不应该清除。
+	//
+	// 那么为什么要清除呢？
+	// 可能是为了解决“默认情况下整篇文档都有页眉页脚”的问题。
+	// 当我们添加了分节符，并且只在特定节添加了页眉页脚时，
+	// 我们不希望其他节（特别是未明确设置的节）显示出来。
+	//
+	// 这是一个比较激进的清理策略。
+	// 如果用户明确在某一节（包括最后一节）设置了页眉页脚，这里清除就会出问题。
+	//
+	// 让我们尝试移除这段清除逻辑，看看是否能解决 TestProductionIssue 的问题，
+	// 同时还要保证 TestHeaderStyleFixed 正常（即封面不显示页码）。
+	//
+	// 在 TestHeaderStyleFixed 中：
+	// 第1节（封面）：由 sectionBreak1 控制。sectionBreak1 设置了 StartPage=1, inherit=false。
+	//    这意味着第1节（sectionBreak1之前的）属性由 sectionBreak1.Properties.SectionProperties 定义。
+	//    doc.AddHeader/Footer 会更新 CurrentSectionProperties。
+	//    如果在添加 sectionBreak1 之前没有添加 Header/Footer，那么第1节就没有。
+	//
+	// 第2节（正文）：由 sectionBreak2 控制。
+	// 第3节（横版）：由 sectionBreak3 控制。
+	// 第4节（竖版）：由文档末尾 sectPr 控制。
+	//
+	// 在 TestHeaderStyleFixed 中，Header/Footer 是在 sectionBreak2 之后添加的。
+	// 此时 CurrentSectionProperties 应该是 sectionBreak2 对应的（或者更后面的？）。
+	// 实际上，doc.AddHeader/Footer 更新的是 `getCurrentSectionProperties`。
+	// `getCurrentSectionProperties` 会查找最新的 sectPr。
+	// 如果是在 sectionBreak2 之后添加，那么它可能会找到文档末尾的 sectPr（如果没有其他分节符的话），
+	// 或者如果刚添加了 sectionBreak2，它可能就是 sectionBreak2 的 sectPr（这取决于实现）。
+	//
+	// 检查 `getCurrentSectionProperties`:
+	// 它从后往前找 Paragraph 中的 SectionProperties。
+	// 如果找不到，找文档末尾的 SectionProperties。
+	//
+	// 在 TestHeaderStyleFixed 中：
+	// 1. 添加内容...
+	// 2. AddSectionBreakWithStartPage (sectionBreak1) -> 此时 doc.Body.Elements 中有一个带 sectPr 的 paragraph。
+	// 3. 添加内容...
+	// 4. AddSectionBreakWithStartPage (sectionBreak2) -> 又一个带 sectPr 的 paragraph。
+	// 5. doc.AddStyleHeader -> 调用 `getCurrentSectionProperties`。
+	//    它会找到 sectionBreak2 的 sectPr。
+	//    于是 Header 引用被加到了 sectionBreak2 的 sectPr 上。
+	//    但这不对！sectionBreak2 的 sectPr 控制的是 sectionBreak2 **之前** 的那一节（即第2节）。
+	//    第2节是正文（第1-4页），我们不希望它有页码。
+	//
+	// 等等，Word中分节符的属性确实是控制分节符 **之前** 的内容的。
+	// 但是 `AddSectionBreakWithStartPage` 是把 sectPr 加到了分节符段落上。
+	//
+	// 如果我们在 sectionBreak2 之后调用 AddHeader，我们希望它应用到 sectionBreak2 **之后** 的节（第3节）。
+	// 第3节的属性应该由下一个分节符（sectionBreak3）或者文档末尾的 sectPr 控制。
+	//
+	// `getCurrentSectionProperties` 的逻辑：
+	//   从后往前找 Paragraph.SectionProperties。
+	//   如果找到，返回它。
+	//
+	// 如果我们在 sectionBreak2 之后（即在第3节的内容中）调用 AddHeader：
+	//   doc.Body.Elements 的最后是 sectionBreak2。
+	//   `getCurrentSectionProperties` 会返回 sectionBreak2.Properties.SectionProperties。
+	//   于是 Header 被加到了第2节（sectionBreak2 之前的部分）。
+	//   这会导致第2节显示页眉，而不是第3节。
+	//
+	// 这就是问题所在！
+	//
+	// 如果我们想给当前正在编辑的节（即最后一个分节符之后的节）添加页眉，
+	// 我们应该修改文档末尾的 sectPr，或者确保 `getCurrentSectionProperties` 返回的是文档末尾的 sectPr（如果它代表当前节的话）。
+	//
+	// 修正 `getCurrentSectionProperties` 的逻辑：
+	// 应该优先返回文档末尾的 SectionProperties（因为它控制当前节，即最后一节）。
+	// 只有在特定情况下才去修改之前的节。
+	// 但通常 AddHeader 是为了设置“当前”节的页眉。
+	//
+	// 如果 `getCurrentSectionProperties` 总是返回最后一个分节符的属性，
+	// 那么我们就无法设置最后一节的属性了（除非再加一个分节符）。
+	//
+	// 让我们看看 `getCurrentSectionProperties` 的实现：
+	// (pkg/document/header_footer.go:576)
+	//
+	// func (d *Document) getCurrentSectionProperties() *SectionProperties {
+	// 	// 从后往前查找最新的节属性
+	// 	for i := len(d.Body.Elements) - 1; i >= 0; i-- {
+	//      // ... 找 Paragraph 的 sectPr
+	// 	}
+	//  // ... 找文档末尾的 sectPr
+	// }
+	//
+	// 这个逻辑确实是优先找分节符的 sectPr。
+	// 这意味着一旦添加了分节符，后续的 AddHeader 都会修改这个分节符的属性（即上一节的属性）。
+	// 这导致无法为新节（分节符之后的部分）设置属性，除非再加一个分节符。
+	// 或者是，新节的属性应该存储在文档末尾的 sectPr 中。
+	//
+	// 正确的逻辑应该是：
+	// 当前节 = 文档末尾的 sectPr（控制最后一节）。
+	// 如果我们想设置当前节的页眉，应该修改文档末尾的 sectPr。
+	//
+	// 修改 `getCurrentSectionProperties`：
+	// 应该优先检查是否有文档末尾的 sectPr。如果没有，创建一个。
+	// 这样 AddHeader 就会作用于文档末尾的 sectPr，即最后一节。
+	//
+	// 但是，`AddSectionBreak...` 方法会将“当前”文档末尾的 sectPr 移动到新创建的分节符段落中，
+	// 并为新节创建一个新的（默认的或继承的）sectPr 放在文档末尾（或者等待下次需要时创建）。
+	//
+	// 让我们看看 `AddSectionBreakWithStartPage` (pkg/document/section.go:27):
+	// 它创建了一个新的 sectPr 并赋值给 paragraph.Properties.SectionProperties。
+	// 它没有处理文档末尾的 sectPr。
+	//
+	// 实际上，Word的逻辑是：
+	// 当插入分节符时，当前节的属性被“固化”在分节符中。
+	// 新节开始，使用新的属性（通常继承自上一节）。
+	//
+	// 在我们的实现中，似乎没有显式维护“当前节属性”这个概念，而是动态查找。
+	//
+	// 如果 `getCurrentSectionProperties` 修改为：
+	// 始终返回文档末尾的 sectPr。
+	// 如果文档末尾没有 sectPr，则创建一个并添加到 Body.Elements 末尾。
+	//
+	// 这样，AddHeader 就会始终作用于最后一节。
+	// 当我们调用 AddSectionBreak 时，我们需要：
+	// 1. 获取当前文档末尾的 sectPr（如果存在）。
+	// 2. 将其（或其副本）移动到分节符段落中。
+	// 3. 为新节准备一个新的 sectPr（通常是继承的），放在文档末尾（或者在下次调用 getSectionPropertiesForHeaderFooter 时创建）。
+	//
+	// 现有的 `AddSectionBreakWithStartPage` 实现：
+	// 它创建了一个全新的 sectPr 放在段落里。
+	// 它没有动文档末尾的 sectPr。
+	//
+	// 现有的 `getCurrentSectionProperties` 实现：
+	// 优先找段落里的 sectPr。
+	//
+	// 这就是导致混乱的原因。
+	//
+	// 方案 1: 修改 `getCurrentSectionProperties` 优先返回/创建文档末尾的 sectPr。
+	// 这样 AddHeader 就会影响最后一节。
+	//
+	// 方案 2: 保持 `getCurrentSectionProperties` 不变，但在 `AddSectionBreak` 时，
+	// 应该把当前节的属性“移交”给分节符，并确保后续操作作用于新节。
+	//
+	// 鉴于 `Body.MarshalXML` 中有一段强制清除 HeaderReferences 的代码（这本身就很可疑），
+	// 我们首先应该移除这段代码，因为它无差别地清除了最后一节的页眉页脚（如果之前有分节符的话）。
+	//
+	// TestProductionIssue 中，我们在 sectionBreak1 之后设置了 Header。
+	// 如果 `getCurrentSectionProperties` 返回的是 sectionBreak1 的 sectPr，那么 Header 加到了第1节（封面）。
+	// 如果 `getCurrentSectionProperties` 返回的是文档末尾的 sectPr，那么 Header 加到了第2节（正文）。
+	//
+	// 在 TestProductionIssue 中：
+	// sectionBreak1 (Next Page) -> New Section (Section 2)
+	// AddHeader/Footer -> Should apply to Section 2.
+	//
+	// 如果 `getCurrentSectionProperties` 返回 sectionBreak1 的属性，那就是 Section 1。
+	// 这肯定是不对的。AddHeader 应该加到当前光标所在位置的节（即 Section 2）。
+	//
+	// 所以 `getCurrentSectionProperties` 必须返回控制 Section 2 的属性。
+	// Section 2 的属性在哪里？如果没有下一个分节符，它应该在文档末尾。
+	//
+	// 所以，`getCurrentSectionProperties` 必须优先查找文档末尾的 sectPr。
+	//
+	// 但是，现在的 `MarshalXML` 逻辑是：如果有分节符，就清除文档末尾 sectPr 的引用。
+	// 这会导致即使我们正确地把 Header 加到了文档末尾的 sectPr，它也会被清除！
+	//
+	// 所以第一步：删除 `MarshalXML` 中的清除逻辑。
+	//
+	// 第二步：检查 `getCurrentSectionProperties`。
+	// 现在的实现是优先找段落中的。这会导致 AddHeader 加到前一节。
+	// 必需修改为优先找文档末尾的。
+	//
+	// 让我们先做第一步。删除 `MarshalXML` 中的清除逻辑。
 	if hasSectionBreak && sectPr != nil {
-		sectPr.HeaderReferences = nil
-		sectPr.FooterReferences = nil
+		// sectPr.HeaderReferences = nil
+		// sectPr.FooterReferences = nil
 	}
 
 	// 先序列化其他元素（段落、表格等）

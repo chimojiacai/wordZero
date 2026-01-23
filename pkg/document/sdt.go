@@ -263,7 +263,7 @@ func (sdt *SDT) AddTOCEntry(text string, level int, pageNum int, bookmarkID stri
 			FontFamily: &FontFamily{ASCII: "宋体", HAnsi: "宋体", EastAsia: "宋体"},
 			FontSize:   &FontSize{Val: "24"}, // 小四（12磅 * 2 = 24）
 		},
-		Text: Text{Content: fmt.Sprintf("%d", pageNum)}, // 初始值，Word会自动更新为正确页码
+		Text: Text{Content: fmt.Sprintf("%d", pageNum)}, // 初始值为计算出的页码
 	})
 
 	// 页码域结束
