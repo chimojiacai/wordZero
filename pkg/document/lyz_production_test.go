@@ -28,7 +28,7 @@ func signPageMock(doc *Document, textFormat *TextFormat, spacingConfig *SpacingC
 
 func shuYuAndDingYi1Mock(doc *Document, textFormat *TextFormat, spacingConfig *SpacingConfig) {
 	bookmarkName := "_Toc_术语和定义"
-	doc.AddHeadingParagraphWithBookmark("术语和定义", 1, bookmarkName)
+	doc.AddHeadingParagraphWithBookmark("术语和定义", 1, bookmarkName, textFormat)
 	doc.AddParagraph("这里是术语和定义的详细内容。")
 	doc.AddParagraph("").AddPageBreak()
 }
@@ -100,7 +100,7 @@ func TestProductionIssue(t *testing.T) {
 	sectionBreak2.AddSectionBreakWithStartPage(OrientationLandscape, doc, 0, true) // 0=延续页码, true=继承页眉页脚
 	
 	bookmarkName2 := "_Toc_横版测试"
-	doc.AddHeadingParagraphWithBookmark("横版测试标题", 1, bookmarkName2)
+	doc.AddHeadingParagraphWithBookmark("横版测试标题", 1, bookmarkName2, textFormat)
 	doc.AddParagraph("这是横版页面的内容，页码应该连续。")
 	doc.AddParagraph("").AddPageBreak()
 	
@@ -109,7 +109,7 @@ func TestProductionIssue(t *testing.T) {
 	sectionBreak3.AddSectionBreakWithStartPage(OrientationPortrait, doc, 0, true)
 	
 	bookmarkName3 := "_Toc_竖版回归"
-	doc.AddHeadingParagraphWithBookmark("竖版回归标题", 1, bookmarkName3)
+	doc.AddHeadingParagraphWithBookmark("竖版回归标题", 1, bookmarkName3, textFormat)
 	doc.AddParagraph("这是回归竖版后的内容，页码应该继续连续。")
 	
 	// 生成目录

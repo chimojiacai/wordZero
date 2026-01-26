@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-
+	
 	"github.com/ZeroHawkeye/wordZero/pkg/style"
 )
 
@@ -45,12 +45,12 @@ func (b *Body) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 	if err := e.EncodeToken(start); err != nil {
 		return err
 	}
-
+	
 	// 分离SectionProperties和其他元素
 	var sectPr *SectionProperties
 	var otherElements []interface{}
 	var hasSectionBreak bool // 标记是否有分节符
-
+	
 	for _, element := range b.Elements {
 		if sp, ok := element.(*SectionProperties); ok {
 			sectPr = sp // 保存最后一个SectionProperties
@@ -62,7 +62,7 @@ func (b *Body) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 			otherElements = append(otherElements, element)
 		}
 	}
-
+	
 	// 如果有分节符，确保文档末尾的SectionProperties没有页眉页脚引用
 	// 这样分节符之前的内容（封面、目录等）就不会显示页眉页脚
 	// 但如果最后一个节有页眉页脚，不应该被清除
@@ -262,21 +262,21 @@ func (b *Body) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 		// sectPr.HeaderReferences = nil
 		// sectPr.FooterReferences = nil
 	}
-
+	
 	// 先序列化其他元素（段落、表格等）
 	for _, element := range otherElements {
 		if err := e.Encode(element); err != nil {
 			return err
 		}
 	}
-
+	
 	// 最后序列化SectionProperties（如果存在）
 	if sectPr != nil {
 		if err := e.Encode(sectPr); err != nil {
 			return err
 		}
 	}
-
+	
 	// 结束元素
 	return e.EncodeToken(start.End())
 }
@@ -570,7 +570,7 @@ type NumID struct {
 // New 创建一个新的Word文档
 func New() *Document {
 	Debugf("创建新文档")
-
+	
 	doc := &Document{
 		Body: &Body{
 			Elements: make([]interface{}, 0),
@@ -583,10 +583,10 @@ func New() *Document {
 			Relationships: []Relationship{},
 		},
 	}
-
+	
 	// 初始化文档结构
 	doc.initializeStructure()
-
+	
 	return doc
 }
 
@@ -614,14 +614,14 @@ func New() *Document {
 //	}
 func Open(filename string) (*Document, error) {
 	Infof("正在打开文档: %s", filename)
-
+	
 	reader, err := zip.OpenReader(filename)
 	if err != nil {
 		Errorf("无法打开文件: %s", filename)
 		return nil, WrapErrorWithContext("open_file", err, filename)
 	}
 	defer reader.Close()
-
+	
 	doc := &Document{
 		parts: make(map[string][]byte),
 		documentRelationships: &Relationships{
@@ -630,7 +630,7 @@ func Open(filename string) (*Document, error) {
 		},
 		nextImageID: 1, // 初始化图片ID计数器
 	}
-
+	
 	// 读取所有文件部件
 	for _, file := range reader.File {
 		rc, err := file.Open()
@@ -638,34 +638,34 @@ func Open(filename string) (*Document, error) {
 			Errorf("无法打开文件部件: %s", file.Name)
 			return nil, WrapErrorWithContext("open_part", err, file.Name)
 		}
-
+		
 		data, err := io.ReadAll(rc)
 		rc.Close()
 		if err != nil {
 			Errorf("无法读取文件部件: %s", file.Name)
 			return nil, WrapErrorWithContext("read_part", err, file.Name)
 		}
-
+		
 		doc.parts[file.Name] = data
 		Debugf("已读取文件部件: %s (%d 字节)", file.Name, len(data))
 	}
-
+	
 	// 初始化样式管理器
 	doc.styleManager = style.NewStyleManager()
-
+	
 	// 解析主文档
 	if err := doc.parseDocument(); err != nil {
 		Errorf("解析文档失败: %s", filename)
 		return nil, WrapErrorWithContext("parse_document", err, filename)
 	}
-
+	
 	// 解析样式文件
 	if err := doc.parseStyles(); err != nil {
 		Debugf("解析样式失败，使用默认样式: %v", err)
 		// 如果样式解析失败，重新初始化为默认样式
 		doc.styleManager = style.NewStyleManager()
 	}
-
+	
 	Infof("成功打开文档: %s", filename)
 	return doc, nil
 }
@@ -694,14 +694,14 @@ func Open(filename string) (*Document, error) {
 //	}
 func (d *Document) Save(filename string) error {
 	Infof("正在保存文档: %s", filename)
-
+	
 	// 确保目录存在
 	dir := filepath.Dir(filename)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		Errorf("无法创建目录: %s", dir)
 		return WrapErrorWithContext("create_dir", err, dir)
 	}
-
+	
 	// 创建文件
 	file, err := os.Create(filename)
 	if err != nil {
@@ -709,32 +709,32 @@ func (d *Document) Save(filename string) error {
 		return WrapErrorWithContext("create_file", err, filename)
 	}
 	defer file.Close()
-
+	
 	// 创建ZIP写入器
 	zipWriter := zip.NewWriter(file)
 	defer zipWriter.Close()
-
+	
 	// 序列化主文档
 	if err := d.serializeDocument(); err != nil {
 		Errorf("序列化文档失败")
 		return WrapError("serialize_document", err)
 	}
-
+	
 	// 序列化样式
 	if err := d.serializeStyles(); err != nil {
 		Errorf("序列化样式失败")
 		return WrapError("serialize_styles", err)
 	}
-
+	
 	// 序列化内容类型
 	d.serializeContentTypes()
-
+	
 	// 序列化关系
 	d.serializeRelationships()
-
+	
 	// 序列化文档关系
 	d.serializeDocumentRelationships()
-
+	
 	// 写入所有部件
 	for name, data := range d.parts {
 		writer, err := zipWriter.Create(name)
@@ -742,15 +742,15 @@ func (d *Document) Save(filename string) error {
 			Errorf("无法创建ZIP条目: %s", name)
 			return WrapErrorWithContext("create_zip_entry", err, name)
 		}
-
+		
 		if _, err := writer.Write(data); err != nil {
 			Errorf("无法写入ZIP条目: %s", name)
 			return WrapErrorWithContext("write_zip_entry", err, name)
 		}
-
+		
 		Debugf("已写入ZIP条目: %s (%d 字节)", name, len(data))
 	}
-
+	
 	Infof("成功保存文档: %s", filename)
 	return nil
 }
@@ -787,7 +787,7 @@ func (d *Document) AddParagraph(text string) *Paragraph {
 			},
 		},
 	}
-
+	
 	d.Body.Elements = append(d.Body.Elements, p)
 	return p
 }
@@ -816,35 +816,35 @@ func (d *Document) AddParagraph(text string) *Paragraph {
 //	title.SetAlignment(document.AlignCenter)
 func (d *Document) AddFormattedParagraph(text string, format *TextFormat) *Paragraph {
 	Debugf("添加格式化段落: %s", text)
-
+	
 	// 创建运行属性
 	runProps := &RunProperties{}
-
+	
 	if format != nil {
 		if format.FontFamily != "" {
 			runProps.FontFamily = &FontFamily{ASCII: format.FontFamily}
 		}
-
+		
 		if format.Bold {
 			runProps.Bold = &Bold{}
 		}
-
+		
 		if format.Italic {
 			runProps.Italic = &Italic{}
 		}
-
+		
 		if format.FontColor != "" {
 			// 确保颜色格式正确（移除#前缀）
 			color := strings.TrimPrefix(format.FontColor, "#")
 			runProps.Color = &Color{Val: color}
 		}
-
+		
 		if format.FontSize > 0 {
 			// Word中字体大小是半磅为单位，所以需要乘以2
 			runProps.FontSize = &FontSize{Val: strconv.Itoa(format.FontSize * 2)}
 		}
 	}
-
+	
 	p := &Paragraph{
 		Runs: []Run{
 			{
@@ -856,7 +856,7 @@ func (d *Document) AddFormattedParagraph(text string, format *TextFormat) *Parag
 			},
 		},
 	}
-
+	
 	d.Body.Elements = append(d.Body.Elements, p)
 	return p
 }
@@ -880,7 +880,7 @@ func (p *Paragraph) SetAlignment(alignment AlignmentType) {
 	if p.Properties == nil {
 		p.Properties = &ParagraphProperties{}
 	}
-
+	
 	p.Properties.Justification = &Justification{Val: string(alignment)}
 	Debugf("设置段落对齐方式: %s", alignment)
 }
@@ -917,27 +917,27 @@ func (p *Paragraph) SetSpacing(config *SpacingConfig) {
 	if p.Properties == nil {
 		p.Properties = &ParagraphProperties{}
 	}
-
+	
 	if config != nil {
 		spacing := &Spacing{}
-
+		
 		if config.BeforePara > 0 {
 			// 转换为TWIPs (1/20磅)
 			spacing.Before = strconv.Itoa(config.BeforePara * 20)
 		}
-
+		
 		if config.AfterPara > 0 {
 			// 转换为TWIPs (1/20磅)
 			spacing.After = strconv.Itoa(config.AfterPara * 20)
 		}
-
+		
 		if config.LineSpacing > 0 {
 			// 行间距，240表示单倍行距
 			spacing.Line = strconv.Itoa(int(config.LineSpacing * 240))
 		}
-
+		
 		p.Properties.Spacing = spacing
-
+		
 		if config.FirstLineIndent > 0 {
 			if p.Properties.Indentation == nil {
 				p.Properties.Indentation = &Indentation{}
@@ -945,7 +945,7 @@ func (p *Paragraph) SetSpacing(config *SpacingConfig) {
 			// 转换为TWIPs (1/20磅)
 			p.Properties.Indentation.FirstLine = strconv.Itoa(config.FirstLineIndent * 20)
 		}
-
+		
 		Debugf("设置段落间距: 段前=%d, 段后=%d, 行距=%.1f, 首行缩进=%d",
 			config.BeforePara, config.AfterPara, config.LineSpacing, config.FirstLineIndent)
 	}
@@ -981,30 +981,30 @@ func (p *Paragraph) SetSpacing(config *SpacingConfig) {
 func (p *Paragraph) AddFormattedText(text string, format *TextFormat) {
 	// 创建运行属性
 	runProps := &RunProperties{}
-
+	
 	if format != nil {
 		if format.FontFamily != "" {
 			runProps.FontFamily = &FontFamily{ASCII: format.FontFamily}
 		}
-
+		
 		if format.Bold {
 			runProps.Bold = &Bold{}
 		}
-
+		
 		if format.Italic {
 			runProps.Italic = &Italic{}
 		}
-
+		
 		if format.FontColor != "" {
 			color := strings.TrimPrefix(format.FontColor, "#")
 			runProps.Color = &Color{Val: color}
 		}
-
+		
 		if format.FontSize > 0 {
 			runProps.FontSize = &FontSize{Val: strconv.Itoa(format.FontSize * 2)}
 		}
 	}
-
+	
 	run := Run{
 		Properties: runProps,
 		Text: Text{
@@ -1012,7 +1012,7 @@ func (p *Paragraph) AddFormattedText(text string, format *TextFormat) {
 			Space:   "preserve",
 		},
 	}
-
+	
 	p.Runs = append(p.Runs, run)
 	Debugf("向段落添加格式化文本: %s", text)
 }
@@ -1038,7 +1038,7 @@ func (p *Paragraph) AddFormattedText(text string, format *TextFormat) {
 //	// 添加三级标题
 //	h3 := doc.AddHeadingParagraph("1.1.1 研究目标", 3)
 func (d *Document) AddHeadingParagraph(text string, level int) *Paragraph {
-	return d.AddHeadingParagraphWithBookmark(text, level, "")
+	return d.AddHeadingParagraphWithBookmark(text, level, "", nil)
 }
 
 // AddHeadingParagraphWithBookmark 向文档添加一个带书签的标题段落。
@@ -1063,47 +1063,56 @@ func (d *Document) AddHeadingParagraph(text string, level int) *Paragraph {
 //
 //	// 添加自动生成书签名的三级标题
 //	h3 := doc.AddHeadingParagraphWithBookmark("1.1.1 研究目标", 3, "auto_bookmark")
-func (d *Document) AddHeadingParagraphWithBookmark(text string, level int, bookmarkName string) *Paragraph {
+func (d *Document) AddHeadingParagraphWithBookmark(text string, level int, bookmarkName string, format *TextFormat) *Paragraph {
 	if level < 1 || level > 9 {
 		Debugf("标题级别 %d 超出范围，使用默认级别 1", level)
 		level = 1
 	}
-
+	
 	styleID := fmt.Sprintf("Heading%d", level)
 	Debugf("添加标题段落: %s (级别: %d, 样式: %s, 书签: %s)", text, level, styleID, bookmarkName)
-
+	
 	// 获取样式管理器中的样式
 	headingStyle := d.styleManager.GetStyle(styleID)
 	if headingStyle == nil {
 		Debugf("警告：找不到样式 %s，使用默认样式", styleID)
 		return d.AddParagraph(text)
 	}
-
+	
 	// 创建运行属性，应用样式中的字符格式
+	// 创建运行属性
 	runProps := &RunProperties{}
-	if headingStyle.RunPr != nil {
-		if headingStyle.RunPr.Bold != nil {
+	
+	if format != nil {
+		if format.FontFamily != "" {
+			runProps.FontFamily = &FontFamily{ASCII: format.FontFamily}
+		}
+		
+		if format.Bold {
 			runProps.Bold = &Bold{}
 		}
-		if headingStyle.RunPr.Italic != nil {
+		
+		if format.Italic {
 			runProps.Italic = &Italic{}
 		}
-		if headingStyle.RunPr.FontSize != nil {
-			runProps.FontSize = &FontSize{Val: headingStyle.RunPr.FontSize.Val}
+		
+		if format.FontColor != "" {
+			// 确保颜色格式正确（移除#前缀）
+			color := strings.TrimPrefix(format.FontColor, "#")
+			runProps.Color = &Color{Val: color}
 		}
-		if headingStyle.RunPr.Color != nil {
-			runProps.Color = &Color{Val: headingStyle.RunPr.Color.Val}
-		}
-		if headingStyle.RunPr.FontFamily != nil {
-			runProps.FontFamily = &FontFamily{ASCII: headingStyle.RunPr.FontFamily.ASCII}
+		
+		if format.FontSize > 0 {
+			// Word中字体大小是半磅为单位，所以需要乘以2
+			runProps.FontSize = &FontSize{Val: strconv.Itoa(format.FontSize * 2)}
 		}
 	}
-
+	
 	// 创建段落属性，应用样式中的段落格式
 	paraProps := &ParagraphProperties{
 		ParagraphStyle: &ParagraphStyle{Val: styleID},
 	}
-
+	
 	// 应用样式中的段落格式
 	if headingStyle.ParagraphPr != nil {
 		if headingStyle.ParagraphPr.Spacing != nil {
@@ -1126,24 +1135,24 @@ func (d *Document) AddHeadingParagraphWithBookmark(text string, level int, bookm
 			}
 		}
 	}
-
+	
 	// 创建段落的Run列表
 	runs := make([]Run, 0)
-
+	
 	// 如果需要添加书签，在段落开始处添加书签开始标记
 	if bookmarkName != "" {
 		// 生成唯一的书签ID
 		bookmarkID := fmt.Sprintf("bookmark_%d_%s", len(d.Body.Elements), bookmarkName)
-
+		
 		// 添加书签开始标记作为单独的元素到文档主体中
 		d.Body.Elements = append(d.Body.Elements, &BookmarkStart{
 			ID:   bookmarkID,
 			Name: bookmarkName,
 		})
-
+		
 		Debugf("添加书签开始: ID=%s, Name=%s", bookmarkID, bookmarkName)
 	}
-
+	
 	// 添加文本内容
 	runs = append(runs, Run{
 		Properties: runProps,
@@ -1152,27 +1161,27 @@ func (d *Document) AddHeadingParagraphWithBookmark(text string, level int, bookm
 			Space:   "preserve",
 		},
 	})
-
+	
 	// 创建段落
 	p := &Paragraph{
 		Properties: paraProps,
 		Runs:       runs,
 	}
-
+	
 	d.Body.Elements = append(d.Body.Elements, p)
-
+	
 	// 如果需要添加书签，在段落结束后添加书签结束标记
 	if bookmarkName != "" {
 		bookmarkID := fmt.Sprintf("bookmark_%d_%s", len(d.Body.Elements)-2, bookmarkName) // -2 因为段落已经添加了
-
+		
 		// 添加书签结束标记
 		d.Body.Elements = append(d.Body.Elements, &BookmarkEnd{
 			ID: bookmarkID,
 		})
-
+		
 		Debugf("添加书签结束: ID=%s", bookmarkID)
 	}
-
+	
 	return p
 }
 
@@ -1189,7 +1198,7 @@ func (p *Paragraph) SetStyle(styleID string) {
 	if p.Properties == nil {
 		p.Properties = &ParagraphProperties{}
 	}
-
+	
 	p.Properties.ParagraphStyle = &ParagraphStyle{Val: styleID}
 	Debugf("设置段落样式: %s", styleID)
 }
@@ -1210,24 +1219,24 @@ func (p *Paragraph) SetIndentation(firstLineCm, leftCm, rightCm float64) {
 	if p.Properties == nil {
 		p.Properties = &ParagraphProperties{}
 	}
-
+	
 	if p.Properties.Indentation == nil {
 		p.Properties.Indentation = &Indentation{}
 	}
-
+	
 	// 转换厘米为TWIPs (1厘米 = 567 TWIPs)
 	if firstLineCm != 0 {
 		p.Properties.Indentation.FirstLine = strconv.Itoa(int(firstLineCm * 567))
 	}
-
+	
 	if leftCm != 0 {
 		p.Properties.Indentation.Left = strconv.Itoa(int(leftCm * 567))
 	}
-
+	
 	if rightCm != 0 {
 		p.Properties.Indentation.Right = strconv.Itoa(int(rightCm * 567))
 	}
-
+	
 	Debugf("设置段落缩进: 首行=%.2fcm, 左=%.2fcm, 右=%.2fcm", firstLineCm, leftCm, rightCm)
 }
 
@@ -1275,18 +1284,18 @@ func (p *Paragraph) SetBorder(top, left, bottom, right *ParagraphBorderConfig) {
 	if p.Properties == nil {
 		p.Properties = &ParagraphProperties{}
 	}
-
+	
 	// 如果没有任何边框配置，清除边框
 	if top == nil && left == nil && bottom == nil && right == nil {
 		p.Properties.ParagraphBorder = nil
 		return
 	}
-
+	
 	// 创建段落边框
 	if p.Properties.ParagraphBorder == nil {
 		p.Properties.ParagraphBorder = &ParagraphBorder{}
 	}
-
+	
 	// 设置上边框
 	if top != nil {
 		p.Properties.ParagraphBorder.Top = &ParagraphBorderLine{
@@ -1298,7 +1307,7 @@ func (p *Paragraph) SetBorder(top, left, bottom, right *ParagraphBorderConfig) {
 	} else {
 		p.Properties.ParagraphBorder.Top = nil
 	}
-
+	
 	// 设置左边框
 	if left != nil {
 		p.Properties.ParagraphBorder.Left = &ParagraphBorderLine{
@@ -1310,7 +1319,7 @@ func (p *Paragraph) SetBorder(top, left, bottom, right *ParagraphBorderConfig) {
 	} else {
 		p.Properties.ParagraphBorder.Left = nil
 	}
-
+	
 	// 设置下边框
 	if bottom != nil {
 		p.Properties.ParagraphBorder.Bottom = &ParagraphBorderLine{
@@ -1322,7 +1331,7 @@ func (p *Paragraph) SetBorder(top, left, bottom, right *ParagraphBorderConfig) {
 	} else {
 		p.Properties.ParagraphBorder.Bottom = nil
 	}
-
+	
 	// 设置右边框
 	if right != nil {
 		p.Properties.ParagraphBorder.Right = &ParagraphBorderLine{
@@ -1334,7 +1343,7 @@ func (p *Paragraph) SetBorder(top, left, bottom, right *ParagraphBorderConfig) {
 	} else {
 		p.Properties.ParagraphBorder.Right = nil
 	}
-
+	
 	Debugf("设置段落边框: 上=%v, 左=%v, 下=%v, 右=%v", top != nil, left != nil, bottom != nil, right != nil)
 }
 
@@ -1364,9 +1373,9 @@ func (p *Paragraph) SetHorizontalRule(style BorderStyle, size int, color string)
 		Color: color,
 		Space: 1, // 默认1磅间距
 	}
-
+	
 	p.SetBorder(nil, nil, borderConfig, nil)
-
+	
 	Debugf("设置水平分割线: 样式=%s, 粗细=%d, 颜色=%s", style, size, color)
 }
 
@@ -1410,7 +1419,7 @@ func (d *Document) initializeStructure() {
 			{PartName: "/word/styles.xml", ContentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"},
 		},
 	}
-
+	
 	// 初始化主关系
 	d.relationships = &Relationships{
 		Xmlns: "http://schemas.openxmlformats.org/package/2006/relationships",
@@ -1422,7 +1431,7 @@ func (d *Document) initializeStructure() {
 			},
 		},
 	}
-
+	
 	// 添加基础部件
 	d.serializeContentTypes()
 	d.serializeRelationships()
@@ -1432,13 +1441,13 @@ func (d *Document) initializeStructure() {
 // parseDocument 解析文档内容
 func (d *Document) parseDocument() error {
 	Debugf("开始解析文档内容")
-
+	
 	// 解析主文档
 	docData, ok := d.parts["word/document.xml"]
 	if !ok {
 		return WrapError("parse_document", ErrDocumentNotFound)
 	}
-
+	
 	// 首先解析基本结构
 	decoder := xml.NewDecoder(bytes.NewReader(docData))
 	for {
@@ -1449,7 +1458,7 @@ func (d *Document) parseDocument() error {
 		if err != nil {
 			return WrapError("parse_document", err)
 		}
-
+		
 		switch t := token.(type) {
 		case xml.StartElement:
 			if t.Name.Local == "document" && t.Name.Space == "http://schemas.openxmlformats.org/wordprocessingml/2006/main" {
@@ -1473,7 +1482,7 @@ func (d *Document) parseDocumentElement(decoder *xml.Decoder) error {
 	d.Body = &Body{
 		Elements: make([]interface{}, 0),
 	}
-
+	
 	for {
 		token, err := decoder.Token()
 		if err == io.EOF {
@@ -1482,7 +1491,7 @@ func (d *Document) parseDocumentElement(decoder *xml.Decoder) error {
 		if err != nil {
 			return WrapError("parse_document_element", err)
 		}
-
+		
 		switch t := token.(type) {
 		case xml.StartElement:
 			switch {
@@ -1498,7 +1507,7 @@ func (d *Document) parseDocumentElement(decoder *xml.Decoder) error {
 			}
 		}
 	}
-
+	
 	return nil
 }
 
@@ -1512,7 +1521,7 @@ func (d *Document) parseBodyElement(decoder *xml.Decoder) error {
 		if err != nil {
 			return WrapError("parse_body_element", err)
 		}
-
+		
 		switch t := token.(type) {
 		case xml.StartElement:
 			element, err := d.parseBodySubElement(decoder, t)
@@ -1528,7 +1537,7 @@ func (d *Document) parseBodyElement(decoder *xml.Decoder) error {
 			}
 		}
 	}
-
+	
 	return nil
 }
 
@@ -1556,13 +1565,13 @@ func (d *Document) parseParagraph(decoder *xml.Decoder, startElement xml.StartEl
 	paragraph := &Paragraph{
 		Runs: make([]Run, 0),
 	}
-
+	
 	for {
 		token, err := decoder.Token()
 		if err != nil {
 			return nil, WrapError("parse_paragraph", err)
 		}
-
+		
 		switch t := token.(type) {
 		case xml.StartElement:
 			switch t.Name.Local {
@@ -1597,13 +1606,13 @@ func (d *Document) parseParagraph(decoder *xml.Decoder, startElement xml.StartEl
 // parseParagraphProperties 解析段落属性
 func (d *Document) parseParagraphProperties(decoder *xml.Decoder, paragraph *Paragraph) error {
 	paragraph.Properties = &ParagraphProperties{}
-
+	
 	for {
 		token, err := decoder.Token()
 		if err != nil {
 			return WrapError("parse_paragraph_properties", err)
 		}
-
+		
 		switch t := token.(type) {
 		case xml.StartElement:
 			switch t.Name.Local {
@@ -1664,13 +1673,13 @@ func (d *Document) parseRun(decoder *xml.Decoder, startElement xml.StartElement)
 	run := &Run{
 		Text: Text{},
 	}
-
+	
 	for {
 		token, err := decoder.Token()
 		if err != nil {
 			return nil, WrapError("parse_run", err)
 		}
-
+		
 		switch t := token.(type) {
 		case xml.StartElement:
 			switch t.Name.Local {
@@ -1683,7 +1692,7 @@ func (d *Document) parseRun(decoder *xml.Decoder, startElement xml.StartElement)
 				// 解析文本
 				space := getAttributeValue(t.Attr, "space")
 				run.Text.Space = space
-
+				
 				// 读取文本内容
 				content, err := d.readElementText(decoder, "t")
 				if err != nil {
@@ -1706,13 +1715,13 @@ func (d *Document) parseRun(decoder *xml.Decoder, startElement xml.StartElement)
 // parseRunProperties 解析运行属性
 func (d *Document) parseRunProperties(decoder *xml.Decoder, run *Run) error {
 	run.Properties = &RunProperties{}
-
+	
 	for {
 		token, err := decoder.Token()
 		if err != nil {
 			return WrapError("parse_run_properties", err)
 		}
-
+		
 		switch t := token.(type) {
 		case xml.StartElement:
 			switch t.Name.Local {
@@ -1785,7 +1794,7 @@ func (d *Document) parseRunProperties(decoder *xml.Decoder, run *Run) error {
 				eastAsia := getAttributeValue(t.Attr, "eastAsia")
 				cs := getAttributeValue(t.Attr, "cs")
 				hint := getAttributeValue(t.Attr, "hint")
-
+				
 				run.Properties.FontFamily = &FontFamily{
 					ASCII:    ascii,
 					HAnsi:    hAnsi,
@@ -1814,13 +1823,13 @@ func (d *Document) parseTable(decoder *xml.Decoder, startElement xml.StartElemen
 	table := &Table{
 		Rows: make([]TableRow, 0),
 	}
-
+	
 	for {
 		token, err := decoder.Token()
 		if err != nil {
 			return nil, WrapError("parse_table", err)
 		}
-
+		
 		switch t := token.(type) {
 		case xml.StartElement:
 			switch t.Name.Local {
@@ -1859,13 +1868,13 @@ func (d *Document) parseTable(decoder *xml.Decoder, startElement xml.StartElemen
 // parseTableProperties 解析表格属性
 func (d *Document) parseTableProperties(decoder *xml.Decoder, table *Table) error {
 	table.Properties = &TableProperties{}
-
+	
 	for {
 		token, err := decoder.Token()
 		if err != nil {
 			return WrapError("parse_table_properties", err)
 		}
-
+		
 		switch t := token.(type) {
 		case xml.StartElement:
 			switch t.Name.Local {
@@ -1974,13 +1983,13 @@ func (d *Document) parseTableGrid(decoder *xml.Decoder, table *Table) error {
 	table.Grid = &TableGrid{
 		Cols: make([]TableGridCol, 0),
 	}
-
+	
 	for {
 		token, err := decoder.Token()
 		if err != nil {
 			return WrapError("parse_table_grid", err)
 		}
-
+		
 		switch t := token.(type) {
 		case xml.StartElement:
 			switch t.Name.Local {
@@ -2009,13 +2018,13 @@ func (d *Document) parseTableRow(decoder *xml.Decoder, startElement xml.StartEle
 	row := &TableRow{
 		Cells: make([]TableCell, 0),
 	}
-
+	
 	for {
 		token, err := decoder.Token()
 		if err != nil {
 			return nil, WrapError("parse_table_row", err)
 		}
-
+		
 		switch t := token.(type) {
 		case xml.StartElement:
 			switch t.Name.Local {
@@ -2053,13 +2062,13 @@ func (d *Document) parseTableCell(decoder *xml.Decoder, startElement xml.StartEl
 	cell := &TableCell{
 		Paragraphs: make([]Paragraph, 0),
 	}
-
+	
 	for {
 		token, err := decoder.Token()
 		if err != nil {
 			return nil, WrapError("parse_table_cell", err)
 		}
-
+		
 		switch t := token.(type) {
 		case xml.StartElement:
 			switch t.Name.Local {
@@ -2095,13 +2104,13 @@ func (d *Document) parseTableCell(decoder *xml.Decoder, startElement xml.StartEl
 // parseSectionProperties 解析节属性
 func (d *Document) parseSectionProperties(decoder *xml.Decoder, startElement xml.StartElement) (*SectionProperties, error) {
 	sectPr := &SectionProperties{}
-
+	
 	for {
 		token, err := decoder.Token()
 		if err != nil {
 			return nil, WrapError("parse_section_properties", err)
 		}
-
+		
 		switch t := token.(type) {
 		case xml.StartElement:
 			switch t.Name.Local {
@@ -2177,7 +2186,7 @@ func (d *Document) skipElement(decoder *xml.Decoder, elementName string) error {
 		if err != nil {
 			return WrapError("skip_element", err)
 		}
-
+		
 		switch token.(type) {
 		case xml.StartElement:
 			depth++
@@ -2196,7 +2205,7 @@ func (d *Document) readElementText(decoder *xml.Decoder, elementName string) (st
 		if err != nil {
 			return "", WrapError("read_element_text", err)
 		}
-
+		
 		switch t := token.(type) {
 		case xml.CharData:
 			content += string(t)
@@ -2221,7 +2230,7 @@ func getAttributeValue(attrs []xml.Attr, name string) string {
 // serializeDocument 序列化文档内容
 func (d *Document) serializeDocument() error {
 	Debugf("开始序列化文档")
-
+	
 	// 创建文档结构
 	type documentXML struct {
 		XMLName  xml.Name `xml:"w:document"`
@@ -2233,7 +2242,7 @@ func (d *Document) serializeDocument() error {
 		XmlnsR   string   `xml:"xmlns:r,attr"`
 		Body     *Body    `xml:"w:body"`
 	}
-
+	
 	doc := documentXML{
 		Xmlns:    "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
 		XmlnsW15: "http://schemas.microsoft.com/office/word/2012/wordml",
@@ -2243,17 +2252,17 @@ func (d *Document) serializeDocument() error {
 		XmlnsR:   "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
 		Body:     d.Body,
 	}
-
+	
 	// 序列化为XML
 	data, err := xml.MarshalIndent(doc, "", "  ")
 	if err != nil {
 		Errorf("XML序列化失败: %v", err)
 		return WrapError("marshal_xml", err)
 	}
-
+	
 	// 添加XML声明
 	d.parts["word/document.xml"] = append([]byte(xml.Header), data...)
-
+	
 	Debugf("文档序列化完成")
 	return nil
 }
@@ -2280,16 +2289,16 @@ func (d *Document) serializeDocumentRelationships() {
 			Target: "styles.xml",
 		},
 	}
-
+	
 	// 添加动态创建的文档级关系（如页眉、页脚等）
 	relationships = append(relationships, d.documentRelationships.Relationships...)
-
+	
 	// 创建文档关系
 	docRels := &Relationships{
 		Xmlns:         "http://schemas.openxmlformats.org/package/2006/relationships",
 		Relationships: relationships,
 	}
-
+	
 	data, _ := xml.MarshalIndent(docRels, "", "  ")
 	d.parts["word/_rels/document.xml.rels"] = append([]byte(xml.Header), data...)
 }
@@ -2297,14 +2306,14 @@ func (d *Document) serializeDocumentRelationships() {
 // serializeStyles 序列化样式
 func (d *Document) serializeStyles() error {
 	Debugf("开始序列化样式")
-
+	
 	// 如果在克隆文档时已经保留了完整的 styles.xml（含 docDefaults 等信息），
 	// 这里直接跳过重新生成，避免丢失模板原有的默认段落/字符设置。
 	if existing, ok := d.parts["word/styles.xml"]; ok && len(existing) > 0 {
 		Debugf("检测到已有 styles.xml，跳过样式重建以保留模板默认样式")
 		return nil
 	}
-
+	
 	// 创建样式结构，包含完整的命名空间
 	type stylesXML struct {
 		XMLName     xml.Name       `xml:"w:styles"`
@@ -2321,7 +2330,7 @@ func (d *Document) serializeStyles() error {
 		MCIgnorable string         `xml:"mc:Ignorable,attr"`
 		Styles      []*style.Style `xml:"w:style"`
 	}
-
+	
 	doc := stylesXML{
 		XmlnsW:      "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
 		XmlnsMC:     "http://schemas.openxmlformats.org/markup-compatibility/2006",
@@ -2336,17 +2345,17 @@ func (d *Document) serializeStyles() error {
 		MCIgnorable: "w14",
 		Styles:      d.styleManager.GetAllStyles(),
 	}
-
+	
 	// 序列化为XML
 	data, err := xml.MarshalIndent(doc, "", "  ")
 	if err != nil {
 		Errorf("XML序列化失败: %v", err)
 		return WrapError("marshal_xml", err)
 	}
-
+	
 	// 添加XML声明
 	d.parts["word/styles.xml"] = append([]byte(xml.Header), data...)
-
+	
 	Debugf("样式序列化完成")
 	return nil
 }
@@ -2354,18 +2363,18 @@ func (d *Document) serializeStyles() error {
 // parseStyles 解析样式文件
 func (d *Document) parseStyles() error {
 	Debugf("开始解析样式文件")
-
+	
 	// 查找样式文件
 	stylesData, ok := d.parts["word/styles.xml"]
 	if !ok {
 		return WrapError("parse_styles", fmt.Errorf("样式文件不存在"))
 	}
-
+	
 	// 使用样式管理器解析样式
 	if err := d.styleManager.LoadStylesFromDocument(stylesData); err != nil {
 		return WrapError("parse_styles", err)
 	}
-
+	
 	Debugf("样式解析完成")
 	return nil
 }
@@ -2374,26 +2383,26 @@ func (d *Document) parseStyles() error {
 func (d *Document) ToBytes() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	zipWriter := zip.NewWriter(buf)
-
+	
 	// 序列化文档
 	if err := d.serializeDocument(); err != nil {
 		return nil, err
 	}
-
+	
 	// 序列化样式
 	if err := d.serializeStyles(); err != nil {
 		return nil, err
 	}
-
+	
 	// 序列化内容类型
 	d.serializeContentTypes()
-
+	
 	// 序列化关系
 	d.serializeRelationships()
-
+	
 	// 序列化文档关系
 	d.serializeDocumentRelationships()
-
+	
 	// 写入所有部件
 	for name, data := range d.parts {
 		writer, err := zipWriter.Create(name)
@@ -2404,11 +2413,11 @@ func (d *Document) ToBytes() ([]byte, error) {
 			return nil, err
 		}
 	}
-
+	
 	if err := zipWriter.Close(); err != nil {
 		return nil, err
 	}
-
+	
 	return buf.Bytes(), nil
 }
 
@@ -2442,13 +2451,13 @@ func (b *Body) AddElement(element interface{}) {
 // parseTableBorders 解析表格边框
 func (d *Document) parseTableBorders(decoder *xml.Decoder) (*TableBorders, error) {
 	borders := &TableBorders{}
-
+	
 	for {
 		token, err := decoder.Token()
 		if err != nil {
 			return nil, WrapError("parse_table_borders", err)
 		}
-
+		
 		switch t := token.(type) {
 		case xml.StartElement:
 			border := &TableBorder{
@@ -2458,7 +2467,7 @@ func (d *Document) parseTableBorders(decoder *xml.Decoder) (*TableBorders, error
 				Color:      getAttributeValue(t.Attr, "color"),
 				ThemeColor: getAttributeValue(t.Attr, "themeColor"),
 			}
-
+			
 			switch t.Name.Local {
 			case "top":
 				borders.Top = border
@@ -2473,7 +2482,7 @@ func (d *Document) parseTableBorders(decoder *xml.Decoder) (*TableBorders, error
 			case "insideV":
 				borders.InsideV = border
 			}
-
+			
 			if err := d.skipElement(decoder, t.Name.Local); err != nil {
 				return nil, err
 			}
@@ -2488,20 +2497,20 @@ func (d *Document) parseTableBorders(decoder *xml.Decoder) (*TableBorders, error
 // parseTableCellMargins 解析表格单元格边距
 func (d *Document) parseTableCellMargins(decoder *xml.Decoder) (*TableCellMargins, error) {
 	margins := &TableCellMargins{}
-
+	
 	for {
 		token, err := decoder.Token()
 		if err != nil {
 			return nil, WrapError("parse_table_cell_margins", err)
 		}
-
+		
 		switch t := token.(type) {
 		case xml.StartElement:
 			space := &TableCellSpace{
 				W:    getAttributeValue(t.Attr, "w"),
 				Type: getAttributeValue(t.Attr, "type"),
 			}
-
+			
 			switch t.Name.Local {
 			case "top":
 				margins.Top = space
@@ -2512,7 +2521,7 @@ func (d *Document) parseTableCellMargins(decoder *xml.Decoder) (*TableCellMargin
 			case "right":
 				margins.Right = space
 			}
-
+			
 			if err := d.skipElement(decoder, t.Name.Local); err != nil {
 				return nil, err
 			}
@@ -2527,13 +2536,13 @@ func (d *Document) parseTableCellMargins(decoder *xml.Decoder) (*TableCellMargin
 // parseTableCellProperties 解析表格单元格属性
 func (d *Document) parseTableCellProperties(decoder *xml.Decoder) (*TableCellProperties, error) {
 	props := &TableCellProperties{}
-
+	
 	for {
 		token, err := decoder.Token()
 		if err != nil {
 			return nil, WrapError("parse_table_cell_properties", err)
 		}
-
+		
 		switch t := token.(type) {
 		case xml.StartElement:
 			switch t.Name.Local {
@@ -2638,13 +2647,13 @@ func (d *Document) parseTableCellProperties(decoder *xml.Decoder) (*TableCellPro
 // parseTableCellBorders 解析表格单元格边框
 func (d *Document) parseTableCellBorders(decoder *xml.Decoder) (*TableCellBorders, error) {
 	borders := &TableCellBorders{}
-
+	
 	for {
 		token, err := decoder.Token()
 		if err != nil {
 			return nil, WrapError("parse_table_cell_borders", err)
 		}
-
+		
 		switch t := token.(type) {
 		case xml.StartElement:
 			border := &TableCellBorder{
@@ -2654,7 +2663,7 @@ func (d *Document) parseTableCellBorders(decoder *xml.Decoder) (*TableCellBorder
 				Color:      getAttributeValue(t.Attr, "color"),
 				ThemeColor: getAttributeValue(t.Attr, "themeColor"),
 			}
-
+			
 			switch t.Name.Local {
 			case "top":
 				borders.Top = border
@@ -2673,7 +2682,7 @@ func (d *Document) parseTableCellBorders(decoder *xml.Decoder) (*TableCellBorder
 			case "tr2bl":
 				borders.TR2BL = border
 			}
-
+			
 			if err := d.skipElement(decoder, t.Name.Local); err != nil {
 				return nil, err
 			}
@@ -2688,20 +2697,20 @@ func (d *Document) parseTableCellBorders(decoder *xml.Decoder) (*TableCellBorder
 // parseTableCellMarginsCell 解析表格单元格边距（单元格级别）
 func (d *Document) parseTableCellMarginsCell(decoder *xml.Decoder) (*TableCellMarginsCell, error) {
 	margins := &TableCellMarginsCell{}
-
+	
 	for {
 		token, err := decoder.Token()
 		if err != nil {
 			return nil, WrapError("parse_table_cell_margins_cell", err)
 		}
-
+		
 		switch t := token.(type) {
 		case xml.StartElement:
 			space := &TableCellSpaceCell{
 				W:    getAttributeValue(t.Attr, "w"),
 				Type: getAttributeValue(t.Attr, "type"),
 			}
-
+			
 			switch t.Name.Local {
 			case "top":
 				margins.Top = space
@@ -2712,7 +2721,7 @@ func (d *Document) parseTableCellMarginsCell(decoder *xml.Decoder) (*TableCellMa
 			case "right":
 				margins.Right = space
 			}
-
+			
 			if err := d.skipElement(decoder, t.Name.Local); err != nil {
 				return nil, err
 			}
@@ -2727,13 +2736,13 @@ func (d *Document) parseTableCellMarginsCell(decoder *xml.Decoder) (*TableCellMa
 // parseTableRowProperties 解析表格行属性
 func (d *Document) parseTableRowProperties(decoder *xml.Decoder) (*TableRowProperties, error) {
 	props := &TableRowProperties{}
-
+	
 	for {
 		token, err := decoder.Token()
 		if err != nil {
 			return nil, WrapError("parse_table_row_properties", err)
 		}
-
+		
 		switch t := token.(type) {
 		case xml.StartElement:
 			switch t.Name.Local {
@@ -2804,25 +2813,25 @@ func (p *Paragraph) AddRun(text string, format *TextFormat, runProps *RunPropert
 		if format.FontFamily != "" {
 			runProps.FontFamily = &FontFamily{ASCII: format.FontFamily}
 		}
-
+		
 		if format.Bold {
 			runProps.Bold = &Bold{}
 		}
-
+		
 		if format.Italic {
 			runProps.Italic = &Italic{}
 		}
-
+		
 		if format.FontColor != "" {
 			color := strings.TrimPrefix(format.FontColor, "#")
 			runProps.Color = &Color{Val: color}
 		}
-
+		
 		if format.FontSize > 0 {
 			runProps.FontSize = &FontSize{Val: strconv.Itoa(format.FontSize * 2)}
 		}
 	}
-
+	
 	run := Run{
 		Properties: runProps,
 		Text: Text{
@@ -2830,7 +2839,7 @@ func (p *Paragraph) AddRun(text string, format *TextFormat, runProps *RunPropert
 			Space:   "preserve",
 		},
 	}
-
+	
 	p.Runs = append(p.Runs, run)
 	Debugf("向段落添加格式化文本: %s", text)
 }

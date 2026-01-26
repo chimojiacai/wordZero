@@ -134,7 +134,7 @@ func (d *Document) UpdateTOC() error {
 // 保留此函数仅为了向后兼容
 func (d *Document) AddHeadingWithBookmark(text string, level int, bookmarkName string) *Paragraph {
 	// 直接调用新的实现
-	return d.AddHeadingParagraphWithBookmark(text, level, bookmarkName)
+	return d.AddHeadingParagraphWithBookmark(text, level, bookmarkName, nil)
 }
 
 // collectHeadings 收集标题信息
@@ -585,15 +585,15 @@ func (d *Document) collectHeadingsWithBookmarks(maxLevel int, skipIndex int, pag
 	contentHeightPt := pageHeightPt - marginTopPt - marginBottomPt
 	
 	// 初始化状态
-	currentY := 0.0           // 当前页面已用高度 (磅)
-	currentPage := 1          // 物理页码 (从1开始)
-	displayPage := 0          // 显示页码 (考虑起始页码设置，初始为0表示无页码)
-
+	currentY := 0.0  // 当前页面已用高度 (磅)
+	currentPage := 1 // 物理页码 (从1开始)
+	displayPage := 0 // 显示页码 (考虑起始页码设置，初始为0表示无页码)
+	
 	// 目录页码偏移修正：如果PageOffset>0，则逻辑页码从1-PageOffset开始
 	if pageOffset > 0 {
 		displayPage = 1 - pageOffset
 	}
-
+	
 	// 检查第一节是否有起始页码设置
 	if currentSection.PageNumType != nil && currentSection.PageNumType.Start != "" {
 		if start, err := strconv.Atoi(currentSection.PageNumType.Start); err == nil {

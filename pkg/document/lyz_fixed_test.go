@@ -59,7 +59,7 @@ func TestHeaderStyleFixed(t *testing.T) {
 	
 	// 为第1-4页添加带书签的标题段落（不显示页眉页脚）
 	bookmarkName1 := "_Toc_第1页内容"
-	pb1 := doc.AddHeadingParagraphWithBookmark("第1页内容", 1, bookmarkName1)
+	pb1 := doc.AddHeadingParagraphWithBookmark("第1页内容", 1, bookmarkName1, textFormat)
 	// 添加第1页的详细内容
 	content1 := doc.AddParagraph("这是第1页的详细内容。这里可以放置一些介绍性文字，说明文档的背景、目的和主要内容。")
 	content1.SetStyle(style.StyleNormal)
@@ -68,7 +68,7 @@ func TestHeaderStyleFixed(t *testing.T) {
 	pb1.AddPageBreak()
 	
 	bookmarkName2 := "_Toc_第2页内容"
-	pb2 := doc.AddHeadingParagraphWithBookmark("第2页内容", 1, bookmarkName2)
+	pb2 := doc.AddHeadingParagraphWithBookmark("第2页内容", 1, bookmarkName2, textFormat)
 	// 添加第2页的详细内容
 	content2 := doc.AddParagraph("这是第2页的详细内容。可以继续扩展文档的内容，提供更多的信息和细节。")
 	content2.SetStyle(style.StyleNormal)
@@ -77,7 +77,7 @@ func TestHeaderStyleFixed(t *testing.T) {
 	pb2.AddPageBreak()
 	
 	bookmarkName3 := "_Toc_第3页内容"
-	pb3 := doc.AddHeadingParagraphWithBookmark("第3页内容", 1, bookmarkName3)
+	pb3 := doc.AddHeadingParagraphWithBookmark("第3页内容", 1, bookmarkName3, textFormat)
 	// 添加第3页的详细内容
 	content3 := doc.AddParagraph("这是第3页的详细内容。文档的中间部分通常包含核心内容和分析。")
 	content3.SetStyle(style.StyleNormal)
@@ -86,7 +86,7 @@ func TestHeaderStyleFixed(t *testing.T) {
 	pb3.AddPageBreak()
 	
 	bookmarkName4 := "_Toc_第4页内容"
-	pb4 := doc.AddHeadingParagraphWithBookmark("第4页内容", 1, bookmarkName4)
+	pb4 := doc.AddHeadingParagraphWithBookmark("第4页内容", 1, bookmarkName4, textFormat)
 	// 添加第4页的详细内容
 	content4 := doc.AddParagraph("这是第4页的详细内容。接近文档的结尾部分，可以开始总结和归纳。")
 	content4.SetStyle(style.StyleNormal)
@@ -114,7 +114,7 @@ func TestHeaderStyleFixed(t *testing.T) {
 	// 使用 AddHeadingParagraphWithBookmark 创建标题，这样可以被目录生成功能识别并支持跳转
 	// 一级标题：四号（14磅），宋体，加粗
 	bookmarkName5 := "_Toc_第五页标题"
-	p := doc.AddHeadingParagraphWithBookmark("第五页标题", 1, bookmarkName5)
+	p := doc.AddHeadingParagraphWithBookmark("第五页标题", 1, bookmarkName5, textFormat)
 	if len(p.Runs) > 0 {
 		if p.Runs[0].Properties == nil {
 			p.Runs[0].Properties = &RunProperties{}
@@ -128,7 +128,7 @@ func TestHeaderStyleFixed(t *testing.T) {
 	
 	// 添加二级标题：小四（12磅），宋体，加粗
 	bookmarkName5_1 := "_Toc_第五页二级标题1"
-	p5_1 := doc.AddHeadingParagraphWithBookmark("第五页二级标题1", 2, bookmarkName5_1)
+	p5_1 := doc.AddHeadingParagraphWithBookmark("第五页二级标题1", 2, bookmarkName5_1, textFormat)
 	if len(p5_1.Runs) > 0 {
 		if p5_1.Runs[0].Properties == nil {
 			p5_1.Runs[0].Properties = &RunProperties{}
@@ -142,7 +142,7 @@ func TestHeaderStyleFixed(t *testing.T) {
 	
 	// 添加三级标题：小四（12磅），宋体，加粗
 	bookmarkName5_1_1 := "_Toc_第五页三级标题1"
-	p5_1_1 := doc.AddHeadingParagraphWithBookmark("第五页三级标题1", 3, bookmarkName5_1_1)
+	p5_1_1 := doc.AddHeadingParagraphWithBookmark("第五页三级标题1", 3, bookmarkName5_1_1, textFormat)
 	if len(p5_1_1.Runs) > 0 {
 		if p5_1_1.Runs[0].Properties == nil {
 			p5_1_1.Runs[0].Properties = &RunProperties{}
@@ -156,7 +156,7 @@ func TestHeaderStyleFixed(t *testing.T) {
 	
 	// 添加另一个二级标题：小四（12磅），宋体，加粗
 	bookmarkName5_2 := "_Toc_第五页二级标题2"
-	p5_2 := doc.AddHeadingParagraphWithBookmark("第五页二级标题2", 2, bookmarkName5_2)
+	p5_2 := doc.AddHeadingParagraphWithBookmark("第五页二级标题2", 2, bookmarkName5_2, textFormat)
 	if len(p5_2.Runs) > 0 {
 		if p5_2.Runs[0].Properties == nil {
 			p5_2.Runs[0].Properties = &RunProperties{}
@@ -298,7 +298,7 @@ func TestHeaderStyleFixed(t *testing.T) {
 	// 添加更多标题用于测试目录显示
 	// 一级标题：四号（14磅），宋体，加粗
 	bookmarkName6 := "_Toc_第七页标题"
-	p6 := doc.AddHeadingParagraphWithBookmark("第七页标题", 1, bookmarkName6)
+	p6 := doc.AddHeadingParagraphWithBookmark("第七页标题", 1, bookmarkName6, textFormat)
 	if len(p6.Runs) > 0 {
 		if p6.Runs[0].Properties == nil {
 			p6.Runs[0].Properties = &RunProperties{}
@@ -312,7 +312,7 @@ func TestHeaderStyleFixed(t *testing.T) {
 	
 	// 添加二级标题：小四（12磅），宋体，加粗
 	bookmarkName6_1 := "_Toc_第七页二级标题1"
-	p6_1 := doc.AddHeadingParagraphWithBookmark("第七页二级标题1", 2, bookmarkName6_1)
+	p6_1 := doc.AddHeadingParagraphWithBookmark("第七页二级标题1", 2, bookmarkName6_1, textFormat)
 	if len(p6_1.Runs) > 0 {
 		if p6_1.Runs[0].Properties == nil {
 			p6_1.Runs[0].Properties = &RunProperties{}
@@ -326,7 +326,7 @@ func TestHeaderStyleFixed(t *testing.T) {
 	
 	// 添加三级标题：小四（12磅），宋体，加粗
 	bookmarkName6_1_1 := "_Toc_第七页三级标题1"
-	p6_1_1 := doc.AddHeadingParagraphWithBookmark("第七页三级标题1", 3, bookmarkName6_1_1)
+	p6_1_1 := doc.AddHeadingParagraphWithBookmark("第七页三级标题1", 3, bookmarkName6_1_1, textFormat)
 	if len(p6_1_1.Runs) > 0 {
 		if p6_1_1.Runs[0].Properties == nil {
 			p6_1_1.Runs[0].Properties = &RunProperties{}
@@ -340,7 +340,7 @@ func TestHeaderStyleFixed(t *testing.T) {
 	
 	// 添加另一个三级标题：小四（12磅），宋体，加粗
 	bookmarkName6_1_2 := "_Toc_第七页三级标题2"
-	p6_1_2 := doc.AddHeadingParagraphWithBookmark("第七页三级标题2", 3, bookmarkName6_1_2)
+	p6_1_2 := doc.AddHeadingParagraphWithBookmark("第七页三级标题2", 3, bookmarkName6_1_2, textFormat)
 	if len(p6_1_2.Runs) > 0 {
 		if p6_1_2.Runs[0].Properties == nil {
 			p6_1_2.Runs[0].Properties = &RunProperties{}
@@ -354,7 +354,7 @@ func TestHeaderStyleFixed(t *testing.T) {
 	
 	// 添加另一个二级标题：小四（12磅），宋体，加粗
 	bookmarkName6_2 := "_Toc_第七页二级标题2"
-	p6_2 := doc.AddHeadingParagraphWithBookmark("第七页二级标题2", 2, bookmarkName6_2)
+	p6_2 := doc.AddHeadingParagraphWithBookmark("第七页二级标题2", 2, bookmarkName6_2, textFormat)
 	if len(p6_2.Runs) > 0 {
 		if p6_2.Runs[0].Properties == nil {
 			p6_2.Runs[0].Properties = &RunProperties{}
@@ -376,17 +376,17 @@ func TestHeaderStyleFixed(t *testing.T) {
 		contentPara6.Runs[0].Properties.FontSize = &FontSize{Val: "24"}
 		contentPara6.Runs[0].Properties.Color = &Color{Val: "000000"}
 	}
-
+	
 	// ---------------- 新增内容 start ----------------
-
+	
 	// 1. 切换到横版
 	contentPara6.AddPageBreak()
 	contentPara6.SetSpacing(&SpacingConfig{BeforePara: 0, AfterPara: 0})
 	contentPara6.AddSectionBreakWithStartPage(OrientationLandscape, doc, 0, true)
-
+	
 	// 第八页：横版图片展示
 	bookmarkName8 := "_Toc_第八页_横版图片"
-	p8 := doc.AddHeadingParagraphWithBookmark("第八页：横版图片展示", 1, bookmarkName8)
+	p8 := doc.AddHeadingParagraphWithBookmark("第八页：横版图片展示", 1, bookmarkName8, textFormat)
 	if len(p8.Runs) > 0 {
 		if p8.Runs[0].Properties == nil {
 			p8.Runs[0].Properties = &RunProperties{}
@@ -396,17 +396,17 @@ func TestHeaderStyleFixed(t *testing.T) {
 		p8.Runs[0].Properties.Color = &Color{Val: "000000"}
 		p8.Runs[0].Properties.Bold = &Bold{}
 	}
-
+	
 	doc.AddParagraph("这里展示横版页面下的图片：")
 	
 	// 插入图片
 	imgConfig := &ImageConfig{
 		Size: &ImageSize{
-			Width:  150, // 宽150mm
-			Height: 100, // 高100mm
+			Width:           150, // 宽150mm
+			Height:          100, // 高100mm
 			KeepAspectRatio: true,
 		},
-		Position: ImagePositionInline,
+		Position:  ImagePositionInline,
 		Alignment: AlignCenter,
 	}
 	// 尝试加载当前目录下的测试图片
@@ -416,14 +416,14 @@ func TestHeaderStyleFixed(t *testing.T) {
 		// 如果图片不存在，加个占位符
 		doc.AddParagraph("[图片占位符：img.png 加载失败]")
 	}
-
+	
 	// 2. 切换回竖版
 	paraImgEnd := doc.AddParagraph("")
 	paraImgEnd.AddSectionBreakWithStartPage(OrientationPortrait, doc, 0, true)
-
+	
 	// 第九页：回归竖版
 	bookmarkName9 := "_Toc_第九页_回归竖版"
-	p9 := doc.AddHeadingParagraphWithBookmark("第九页：回归竖版", 1, bookmarkName9)
+	p9 := doc.AddHeadingParagraphWithBookmark("第九页：回归竖版", 1, bookmarkName9, textFormat)
 	if len(p9.Runs) > 0 {
 		if p9.Runs[0].Properties == nil {
 			p9.Runs[0].Properties = &RunProperties{}
@@ -435,7 +435,7 @@ func TestHeaderStyleFixed(t *testing.T) {
 	}
 	
 	doc.AddParagraph("这是第九页，页面方向已切回竖版，页码应继续连续编号。")
-
+	
 	// ---------------- 新增内容 end ----------------
 	
 	// 在目录页位置生成目录

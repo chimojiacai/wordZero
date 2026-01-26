@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"testing"
 	"time"
-
+	
 	"github.com/ZeroHawkeye/wordZero/pkg/style"
 )
 
@@ -23,12 +23,12 @@ func TestHeaderStyle(t *testing.T) {
 		Orientation:  OrientationPortrait,
 		Size:         PageSizeA4,
 	})
-
+	
 	// 首页 - 只创建内容，不设置页眉页脚
 	coverTitle := doc.AddParagraph("文档标题")
 	coverTitle.SetStyle(style.StyleTitle)
 	coverTitle.SetAlignment(AlignCenter)
-
+	
 	coverContent := doc.AddParagraph("公司名称")
 	coverContent.SetAlignment(AlignCenter)
 	textFormat := &TextFormat{
@@ -39,23 +39,23 @@ func TestHeaderStyle(t *testing.T) {
 	}
 	reportExplain(doc, textFormat, &SpacingConfig{})
 	reportExplain(doc, textFormat, &SpacingConfig{})
-
+	
 	doc.AddParagraph("").AddPageBreak()
-
+	
 	// 目录页 - 先创建目录标题占位符，后续会被目录内容替换
 	tocTitlePara := doc.AddParagraph("目录")
 	tocTitlePara.SetStyle(style.StyleHeading1)
-
+	
 	// 记录目录插入位置（占位符段落的位置）
 	tocInsertIndex := len(doc.Body.Elements) - 1
-
+	
 	// 目录之后，应该是第1页
 	shuban(doc, textFormat)
-
+	
 	// 添加分节符，从这里开始启用新的节（竖版）
 	sectionBreak1 := doc.AddParagraph("")
 	sectionBreak1.AddSectionBreak(OrientationPortrait, doc)
-
+	
 	// 在新节上配置页眉页脚（只影响新节及之后内容）
 	// 注意：必须在分节符之后设置页眉页脚
 	err := doc.AddStyleHeader(HeaderFooterTypeDefault, "xxx科技有限公司\nRLHB", "2025010", &TextFormat{
@@ -66,16 +66,16 @@ func TestHeaderStyle(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-
+	
 	if err := doc.AddFooterWithPageNumber(HeaderFooterTypeDefault, "", true); err != nil {
 		t.Error(err)
 	}
 	// 重置页码从1开始（在设置页眉页脚之后）
 	doc.RestartPageNumber()
-
+	
 	// 使用 AddHeadingParagraphWithBookmark 创建标题，这样可以被目录生成功能识别并支持跳转
 	bookmarkName1 := "_Toc_第二页标题"
-	p := doc.AddHeadingParagraphWithBookmark("第二页标题", 1, bookmarkName1)
+	p := doc.AddHeadingParagraphWithBookmark("第二页标题", 1, bookmarkName1, textFormat)
 	// 如果需要自定义格式，可以更新Run的属性
 	if len(p.Runs) > 0 {
 		if p.Runs[0].Properties == nil {
@@ -87,7 +87,7 @@ func TestHeaderStyle(t *testing.T) {
 		p.Runs[0].Properties.Color = &Color{Val: "000000"}
 		p.Runs[0].Properties.Bold = &Bold{}
 	}
-
+	
 	// 在标题后添加一些内容，确保页面有内容
 	contentPara := doc.AddParagraph("这是第二页标题页面的内容。")
 	if len(contentPara.Runs) > 0 {
@@ -98,23 +98,23 @@ func TestHeaderStyle(t *testing.T) {
 		contentPara.Runs[0].Properties.FontSize = &FontSize{Val: "24"} // 12磅 * 2
 		contentPara.Runs[0].Properties.Color = &Color{Val: "000000"}
 	}
-
+	
 	// 在内容段落后添加分页符和分节符（切换到横版）
 	contentPara.AddPageBreak()
 	contentPara.SetSpacing(&SpacingConfig{
 		BeforePara: 0,
 		AfterPara:  0,
 	})
-
+	
 	// 使用 AddSectionBreakContinuous 保持页码连续
 	contentPara.AddSectionBreakContinuous(OrientationLandscape, doc)
-
+	
 	// 标题段落也需要设置间距
 	p.SetSpacing(&SpacingConfig{
 		BeforePara: 0,
 		AfterPara:  0,
 	})
-
+	
 	// 在横版节中再次设置页眉页脚，确保横向页面也有页眉页脚
 	// 注意：不要在这里调用RestartPageNumber()，以保持页码连续
 	err = doc.AddStyleHeader(HeaderFooterTypeDefault, "xxx科技有限公司\nRLHB", "2025010", &TextFormat{
@@ -129,7 +129,7 @@ func TestHeaderStyle(t *testing.T) {
 		t.Error(err)
 	}
 	// 不要在这里再次重置页码，保持页码连续
-
+	
 	textFormat.Bold = false
 	textFormat.FontSize = 12
 	// 表格:标准依据
@@ -146,13 +146,13 @@ func TestHeaderStyle(t *testing.T) {
 	tableBz.MergeCellsVertical(9, 10, 0)
 	tableBz.MergeCellsVertical(12, 13, 0)
 	tableBz.MergeCellsVertical(14, 15, 0)
-
+	
 	tableBz.SetCellText(0, 0, "适用范围")
 	tableBz.SetCellText(0, 1, "文件名")
 	tableBz.SetCellText(0, 2, "文件编号")
 	tableBz.SetCellText(1, 0, "生态环境部")
 	tableBz.SetCellText(1, 1, "《石化行业VOCs污染源排查工作指南》")
-
+	
 	tableBz.SetCellText(2, 1, "《泄漏和敞开液面排放的挥发性有机物检测技术导则》")
 	tableBz.SetCellText(2, 2, "HJ 733-2014")
 	tableBz.SetCellText(3, 1, "《工业企业挥发性有机物泄漏检测与修复技术指南》")
@@ -210,18 +210,18 @@ func TestHeaderStyle(t *testing.T) {
 	tableBz.SetCellText(22, 0, "宁夏石嘴山")
 	tableBz.SetCellText(22, 1, "《石嘴山市环境保护局（关于在化工企业开展泄漏检测与修复）》")
 	tableBz.SetCellText(22, 2, "石环通字〔2018〕46号")
-
+	
 	for i := 0; i < tableBz.GetRowCount(); i++ {
 		tableBz.SetRowHeight(i, &RowHeightConfig{
 			Height: 33,
 			Rule:   RowHeightMinimum,
 		})
 	}
-
+	
 	// 添加分节符，切换回竖版（保持页码连续）
 	sectionBreak2 := doc.AddParagraph("")
 	sectionBreak2.AddSectionBreakContinuous(OrientationPortrait, doc)
-
+	
 	// 在竖版节中再次设置页眉页脚
 	err = doc.AddStyleHeader(HeaderFooterTypeDefault, "xxx科技有限公司\nRLHB", "2025010", &TextFormat{
 		FontFamily: "SimSun",
@@ -234,12 +234,12 @@ func TestHeaderStyle(t *testing.T) {
 	if err := doc.AddFooterWithPageNumber(HeaderFooterTypeDefault, "", true); err != nil {
 		t.Error(err)
 	}
-
+	
 	// 使用 AddHeadingParagraphWithBookmark 创建标题，这样可以被目录生成功能识别并支持跳转
 	textFormat.Bold = true
 	textFormat.FontSize = 14
 	shuban(doc, textFormat)
-
+	
 	// 在目录页位置生成目录
 	tocConfig := &TOCConfig{
 		Title:        "目录",
@@ -249,19 +249,19 @@ func TestHeaderStyle(t *testing.T) {
 		UseHyperlink: true,
 		DotLeader:    true,
 	}
-
+	
 	// 调用toc.go中的方法生成目录
 	if err := doc.GenerateTOCAtPosition(tocConfig, tocInsertIndex, tocInsertIndex); err != nil {
 		t.Error(err)
 	}
-
+	
 	// 保存文档
 	outputPath := "test.docx"
 	if err := doc.Save(outputPath); err != nil {
 		t.Error(err)
 		return
 	}
-
+	
 	// 注意：目录页码使用PAGEREF字段，初始值为占位符1
 	// 打开Word文档后，按Ctrl+A全选，然后按F9更新所有字段，即可更新目录页码
 	t.Logf("文档已保存: %s", outputPath)
@@ -270,7 +270,7 @@ func TestHeaderStyle(t *testing.T) {
 
 func shuban(doc *Document, textFormat *TextFormat) {
 	bookmarkName2 := "_Toc_3_企业基本信息"
-	p1 := doc.AddHeadingParagraphWithBookmark("3 企业基本信息", 1, bookmarkName2)
+	p1 := doc.AddHeadingParagraphWithBookmark("3 企业基本信息", 1, bookmarkName2, textFormat)
 	// 如果需要自定义格式，可以更新Run的属性
 	if len(p1.Runs) > 0 {
 		if p1.Runs[0].Properties == nil {
@@ -283,15 +283,15 @@ func shuban(doc *Document, textFormat *TextFormat) {
 		p1.Runs[0].Properties.Bold = &Bold{}
 	}
 	p1.AddPageBreak()
-
+	
 	// 如果需要在此节中设置页眉页脚（保持与之前相同的页眉页脚）
 	// 由于前面已经设置了页眉页脚，这里无需重复设置
 	// 但需要确保当前节的页码继续增加
-
+	
 	textFormat.Bold = false
 	textFormat.FontSize = 12
 	doc.AddFormattedParagraph("我的来急啦圣诞节啦解放啦解放啦是老大解放啦卡随机发", textFormat)
-
+	
 	textFormat.FontSize = 16
 	content := doc.AddFormattedParagraph("委托单位：", textFormat)
 	content.SetSpacing(&SpacingConfig{
@@ -323,7 +323,7 @@ func shuban(doc *Document, textFormat *TextFormat) {
 			Val: "single",
 		},
 	})
-
+	
 	// 下标测试
 	content = doc.AddFormattedParagraph("x", textFormat)
 	content.AddRun("1", textFormat, &RunProperties{
@@ -342,7 +342,7 @@ func reportExplain(doc *Document, textFormat *TextFormat, spacingConfig *Spacing
 	spacingConfig.BeforePara = 0
 	spacingConfig.AfterPara = 30
 	content.SetSpacing(spacingConfig)
-
+	
 	textFormat.FontSize = 15
 	//doc.AddImageFromFile(picDir+"zhang.png",)
 	content = doc.AddFormattedParagraph("1、本公司检测报告须同时具有检验检测专用章、骑缝章及CMA章标志，缺少其中之一则报告无效。", textFormat)
@@ -352,40 +352,40 @@ func reportExplain(doc *Document, textFormat *TextFormat, spacingConfig *Spacing
 	spacingConfig.LineSpacing = 1.5
 	spacingConfig.FirstLineIndent = 22
 	content.SetSpacing(spacingConfig)
-
+	
 	content = doc.AddFormattedParagraph("2、结果表述清晰，易于理解。无授权签字人签字识别的，报告无效。", textFormat)
 	content.SetStyle(style.StyleNormal)
 	content.SetAlignment(AlignLeft)
 	content.SetSpacing(spacingConfig)
-
+	
 	content = doc.AddFormattedParagraph("3、当需要对检测报告做出意见和解释时，本公司依据评审准则将意见和解释在报告中清晰标注。", textFormat)
 	content.SetStyle(style.StyleNormal)
 	content.SetAlignment(AlignLeft)
 	content.SetSpacing(spacingConfig)
-
+	
 	content = doc.AddFormattedParagraph("4、本报告未经同意不得用于广告宣传，复制本报告中的部分内容无效。", textFormat)
 	content.SetStyle(style.StyleNormal)
 	content.SetAlignment(AlignLeft)
 	spacingConfig.BeforePara = 0
 	spacingConfig.AfterPara = 130
 	content.SetSpacing(spacingConfig)
-
+	
 	content = doc.AddFormattedParagraph("编制单位：河南瑞蓝环保科技有限公司", textFormat)
 	content.SetStyle(style.StyleNormal)
 	content.SetAlignment(AlignLeft)
 	spacingConfig.AfterPara = 0
 	content.SetSpacing(spacingConfig)
-
+	
 	content = doc.AddFormattedParagraph("单位地址：河南省郑州市高新技术产业开发区西三环路283号11号楼5层30号", textFormat)
 	content.SetStyle(style.StyleNormal)
 	content.SetAlignment(AlignLeft)
 	content.SetSpacing(spacingConfig)
-
+	
 	content = doc.AddFormattedParagraph("联系电话：0371-86557168", textFormat)
 	content.SetStyle(style.StyleNormal)
 	content.SetAlignment(AlignLeft)
 	content.SetSpacing(spacingConfig)
-
+	
 	content = doc.AddFormattedParagraph("邮    箱：hnrlhbkj@126.com", textFormat)
 	content.SetStyle(style.StyleNormal)
 	content.SetAlignment(AlignLeft)
