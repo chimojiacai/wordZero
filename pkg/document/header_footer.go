@@ -668,6 +668,10 @@ func (d *Document) AddStyleHeader(headerType HeaderFooterType, text, redText str
 			paragraph.Runs = append(paragraph.Runs, run)
 		}
 	}
+	
+	// 为页眉添加实线下划线
+	paragraph.SetHorizontalRule(BorderStyleSingle, 12, "000000")
+	
 	header.Paragraphs = append(header.Paragraphs, paragraph)
 
 	// 生成关系ID

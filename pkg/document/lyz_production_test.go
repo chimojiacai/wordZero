@@ -79,7 +79,7 @@ func TestProductionIssue(t *testing.T) {
 	sectionBreak1 := doc.AddParagraph("")
 	sectionBreak1.AddSectionBreakWithStartPage(OrientationPortrait, doc, 1, false) // false 表示不继承上一节（无）的页眉页脚
 	// 在新节开始处设置页眉页脚
-	err := doc.AddStyleHeader(HeaderFooterTypeDefault, "xxx科技有限公司\nRLHB", "2025010", &TextFormat{
+	err := doc.AddStyleHeader(HeaderFooterTypeDefault, "xxx科技有限公司 RLHB", "", &TextFormat{
 		FontFamily: "SimSun",
 		FontSize:   9,
 		FontColor:  "000000",
@@ -102,15 +102,15 @@ func TestProductionIssue(t *testing.T) {
 	bookmarkName2 := "_Toc_横版测试"
 	doc.AddHeadingParagraphWithBookmark("横版测试标题", 1, bookmarkName2, textFormat)
 	doc.AddParagraph("这是横版页面的内容，页码应该连续。")
-	doc.AddParagraph("").AddPageBreak()
+	//doc.AddParagraph("").AddPageBreak()
 	
-	// 7. 切回竖版
-	sectionBreak3 := doc.AddParagraph("")
-	sectionBreak3.AddSectionBreakWithStartPage(OrientationPortrait, doc, 0, true)
-	
-	bookmarkName3 := "_Toc_竖版回归"
-	doc.AddHeadingParagraphWithBookmark("竖版回归标题", 1, bookmarkName3, textFormat)
-	doc.AddParagraph("这是回归竖版后的内容，页码应该继续连续。")
+	//// 7. 切回竖版
+	//sectionBreak3 := doc.AddParagraph("")
+	//sectionBreak3.AddSectionBreakWithStartPage(OrientationPortrait, doc, 0, true)
+	//
+	//bookmarkName3 := "_Toc_竖版回归"
+	//doc.AddHeadingParagraphWithBookmark("竖版回归标题", 1, bookmarkName3, textFormat)
+	//doc.AddParagraph("这是回归竖版后的内容，页码应该继续连续。")
 	
 	// 生成目录
 	tocConfig := &TOCConfig{
