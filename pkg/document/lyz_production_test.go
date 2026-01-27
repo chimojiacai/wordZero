@@ -104,13 +104,13 @@ func TestProductionIssue(t *testing.T) {
 	doc.AddParagraph("这是横版页面的内容，页码应该连续。")
 	//doc.AddParagraph("").AddPageBreak()
 	
-	//// 7. 切回竖版
-	//sectionBreak3 := doc.AddParagraph("")
-	//sectionBreak3.AddSectionBreakWithStartPage(OrientationPortrait, doc, 0, true)
-	//
-	//bookmarkName3 := "_Toc_竖版回归"
-	//doc.AddHeadingParagraphWithBookmark("竖版回归标题", 1, bookmarkName3, textFormat)
-	//doc.AddParagraph("这是回归竖版后的内容，页码应该继续连续。")
+	// 7. 切回竖版
+	sectionBreak3 := doc.AddParagraph("")
+	sectionBreak3.AddSectionBreakWithStartPage(OrientationPortrait, doc, 0, true)
+	
+	bookmarkName3 := "_Toc_竖版回归"
+	doc.AddHeadingParagraphWithBookmark("竖版回归标题", 1, bookmarkName3, textFormat)
+	doc.AddParagraph("这是回归竖版后的内容，页码应该继续连续。")
 	
 	// 生成目录
 	tocConfig := &TOCConfig{
