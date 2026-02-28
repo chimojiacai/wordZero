@@ -1182,6 +1182,7 @@ func (d *Document) createTOCEntryWithFields(entry TOCEntry, config *TOCConfig) *
 					},
 				},
 			},
+			Justification: &Justification{Val: "center"}, // 设置居中对齐
 		},
 		Runs: []Run{},
 	}

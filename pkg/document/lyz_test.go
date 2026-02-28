@@ -138,6 +138,7 @@ func TestHeaderStyle(t *testing.T) {
 		Cols:      3,
 		ColWidths: []int{2000, 4000, 3000},
 		Width:     9000,
+		BorderVal: "none",
 	})
 	if tableBz == nil {
 		return

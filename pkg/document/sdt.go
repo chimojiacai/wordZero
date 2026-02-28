@@ -187,6 +187,7 @@ func (sdt *SDT) AddTOCEntry(text string, level int, pageNum int, bookmarkID stri
 					},
 				},
 			},
+			Justification: &Justification{Val: "center"}, // 设置居中对齐
 		},
 		Runs: []Run{},
 	}

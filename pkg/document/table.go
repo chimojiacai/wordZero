@@ -157,6 +157,7 @@ type TableConfig struct {
 	Width     int        // 表格总宽度（磅）
 	ColWidths []int      // 各列宽度（磅），如果为空则平均分配
 	Data      [][]string // 初始数据
+	BorderVal string     // 表格边框样式（默认为"single"）
 }
 
 // CreateTable 创建一个新表格
@@ -165,7 +166,10 @@ func (d *Document) CreateTable(config *TableConfig) *Table {
 		Error("表格行数和列数必须大于0")
 		return nil
 	}
-
+	if config.BorderVal == "" {
+		config.BorderVal = "single"
+	}
+	
 	table := &Table{
 		Properties: &TableProperties{
 			TableW: &TableWidth{
@@ -187,37 +191,37 @@ func (d *Document) CreateTable(config *TableConfig) *Table {
 			// 添加默认表格边框，使用与tmp_test参考表格相同的单线边框样式
 			TableBorders: &TableBorders{
 				Top: &TableBorder{
-					Val:   "single", // 单线边框样式
-					Sz:    "4",      // 边框粗细（1/8磅）
-					Space: "0",      // 边框间距
-					Color: "auto",   // 自动颜色
+					Val:   config.BorderVal, // 单线边框样式
+					Sz:    "4",              // 边框粗细（1/8磅）
+					Space: "0",              // 边框间距
+					Color: "auto",           // 自动颜色
 				},
 				Left: &TableBorder{
-					Val:   "single",
+					Val:   config.BorderVal,
 					Sz:    "4",
 					Space: "0",
 					Color: "auto",
 				},
 				Bottom: &TableBorder{
-					Val:   "single",
+					Val:   config.BorderVal,
 					Sz:    "4",
 					Space: "0",
 					Color: "auto",
 				},
 				Right: &TableBorder{
-					Val:   "single",
+					Val:   config.BorderVal,
 					Sz:    "4",
 					Space: "0",
 					Color: "auto",
 				},
 				InsideH: &TableBorder{
-					Val:   "single",
+					Val:   config.BorderVal,
 					Sz:    "4",
 					Space: "0",
 					Color: "auto",
 				},
 				InsideV: &TableBorder{
-					Val:   "single",
+					Val:   config.BorderVal,
 					Sz:    "4",
 					Space: "0",
 					Color: "auto",
@@ -241,7 +245,7 @@ func (d *Document) CreateTable(config *TableConfig) *Table {
 		Grid: &TableGrid{},
 		Rows: make([]TableRow, 0, config.Rows),
 	}
-
+	
 	// 设置列宽
 	colWidths := config.ColWidths
 	if len(colWidths) == 0 {
@@ -255,20 +259,20 @@ func (d *Document) CreateTable(config *TableConfig) *Table {
 		Error("列宽数量与列数不匹配")
 		return nil
 	}
-
+	
 	// 创建表格网格
 	for _, width := range colWidths {
 		table.Grid.Cols = append(table.Grid.Cols, TableGridCol{
 			W: fmt.Sprintf("%d", width),
 		})
 	}
-
+	
 	// 创建表格行和单元格
 	for i := 0; i < config.Rows; i++ {
 		row := TableRow{
 			Cells: make([]TableCell, 0, config.Cols),
 		}
-
+		
 		for j := 0; j < config.Cols; j++ {
 			cell := TableCell{
 				Properties: &TableCellProperties{
@@ -292,18 +296,18 @@ func (d *Document) CreateTable(config *TableConfig) *Table {
 					},
 				},
 			}
-
+			
 			// 如果有初始数据，设置单元格内容
 			if config.Data != nil && i < len(config.Data) && j < len(config.Data[i]) {
 				cell.Paragraphs[0].Runs[0].Text.Content = config.Data[i][j]
 			}
-
+			
 			row.Cells = append(row.Cells, cell)
 		}
-
+		
 		table.Rows = append(table.Rows, row)
 	}
-
+	
 	Info(fmt.Sprintf("创建表格成功：%d行 x %d列", config.Rows, config.Cols))
 	return table
 }
@@ -314,10 +318,10 @@ func (d *Document) AddTable(config *TableConfig) *Table {
 	if table == nil {
 		return nil
 	}
-
+	
 	// 将表格添加到文档主体中
 	d.Body.Elements = append(d.Body.Elements, table)
-
+	
 	Info(fmt.Sprintf("表格已添加到文档，当前文档包含%d个表格", len(d.Body.GetTables())))
 	return table
 }
@@ -327,21 +331,21 @@ func (t *Table) InsertRow(position int, data []string) error {
 	if position < 0 || position > len(t.Rows) {
 		return fmt.Errorf("插入位置无效：%d，表格共有%d行", position, len(t.Rows))
 	}
-
+	
 	if len(t.Rows) == 0 {
 		return fmt.Errorf("表格没有列定义，无法插入行")
 	}
-
+	
 	colCount := len(t.Rows[0].Cells)
 	if len(data) > colCount {
 		return fmt.Errorf("数据列数(%d)超过表格列数(%d)", len(data), colCount)
 	}
-
+	
 	// 创建新行
 	newRow := TableRow{
 		Cells: make([]TableCell, colCount),
 	}
-
+	
 	// 复制第一行的单元格属性作为模板
 	templateRow := t.Rows[0]
 	for i := 0; i < colCount; i++ {
@@ -359,13 +363,13 @@ func (t *Table) InsertRow(position int, data []string) error {
 				},
 			},
 		}
-
+		
 		// 设置数据
 		if i < len(data) {
 			newRow.Cells[i].Paragraphs[0].Runs[0].Text.Content = data[i]
 		}
 	}
-
+	
 	// 插入行
 	if position == len(t.Rows) {
 		// 在末尾添加
@@ -375,7 +379,7 @@ func (t *Table) InsertRow(position int, data []string) error {
 		t.Rows = append(t.Rows[:position+1], t.Rows[position:]...)
 		t.Rows[position] = newRow
 	}
-
+	
 	Info(fmt.Sprintf("在位置%d插入行成功", position))
 	return nil
 }
@@ -390,14 +394,14 @@ func (t *Table) DeleteRow(rowIndex int) error {
 	if rowIndex < 0 || rowIndex >= len(t.Rows) {
 		return fmt.Errorf("行索引无效：%d，表格共有%d行", rowIndex, len(t.Rows))
 	}
-
+	
 	if len(t.Rows) <= 1 {
 		return fmt.Errorf("表格至少需要保留一行")
 	}
-
+	
 	// 删除行
 	t.Rows = append(t.Rows[:rowIndex], t.Rows[rowIndex+1:]...)
-
+	
 	Info(fmt.Sprintf("删除第%d行成功", rowIndex))
 	return nil
 }
@@ -407,15 +411,15 @@ func (t *Table) DeleteRows(startIndex, endIndex int) error {
 	if startIndex < 0 || endIndex >= len(t.Rows) || startIndex > endIndex {
 		return fmt.Errorf("行索引范围无效：[%d, %d]，表格共有%d行", startIndex, endIndex, len(t.Rows))
 	}
-
+	
 	deleteCount := endIndex - startIndex + 1
 	if len(t.Rows)-deleteCount < 1 {
 		return fmt.Errorf("删除后表格至少需要保留一行")
 	}
-
+	
 	// 删除行范围
 	t.Rows = append(t.Rows[:startIndex], t.Rows[endIndex+1:]...)
-
+	
 	Info(fmt.Sprintf("删除第%d到%d行成功", startIndex, endIndex))
 	return nil
 }
@@ -425,16 +429,16 @@ func (t *Table) InsertColumn(position int, data []string, width int) error {
 	if len(t.Rows) == 0 {
 		return fmt.Errorf("表格没有行，无法插入列")
 	}
-
+	
 	colCount := len(t.Rows[0].Cells)
 	if position < 0 || position > colCount {
 		return fmt.Errorf("插入位置无效：%d，表格共有%d列", position, colCount)
 	}
-
+	
 	if len(data) > len(t.Rows) {
 		return fmt.Errorf("数据行数(%d)超过表格行数(%d)", len(data), len(t.Rows))
 	}
-
+	
 	// 更新表格网格
 	newGridCol := TableGridCol{
 		W: fmt.Sprintf("%d", width),
@@ -445,7 +449,7 @@ func (t *Table) InsertColumn(position int, data []string, width int) error {
 		t.Grid.Cols = append(t.Grid.Cols[:position+1], t.Grid.Cols[position:]...)
 		t.Grid.Cols[position] = newGridCol
 	}
-
+	
 	// 为每一行插入新单元格
 	for i := range t.Rows {
 		newCell := TableCell{
@@ -470,12 +474,12 @@ func (t *Table) InsertColumn(position int, data []string, width int) error {
 				},
 			},
 		}
-
+		
 		// 设置数据
 		if i < len(data) {
 			newCell.Paragraphs[0].Runs[0].Text.Content = data[i]
 		}
-
+		
 		// 插入单元格
 		if position == len(t.Rows[i].Cells) {
 			t.Rows[i].Cells = append(t.Rows[i].Cells, newCell)
@@ -484,7 +488,7 @@ func (t *Table) InsertColumn(position int, data []string, width int) error {
 			t.Rows[i].Cells[position] = newCell
 		}
 	}
-
+	
 	Info(fmt.Sprintf("在位置%d插入列成功", position))
 	return nil
 }
@@ -503,24 +507,24 @@ func (t *Table) DeleteColumn(colIndex int) error {
 	if len(t.Rows) == 0 {
 		return fmt.Errorf("表格没有行")
 	}
-
+	
 	colCount := len(t.Rows[0].Cells)
 	if colIndex < 0 || colIndex >= colCount {
 		return fmt.Errorf("列索引无效：%d，表格共有%d列", colIndex, colCount)
 	}
-
+	
 	if colCount <= 1 {
 		return fmt.Errorf("表格至少需要保留一列")
 	}
-
+	
 	// 删除网格列
 	t.Grid.Cols = append(t.Grid.Cols[:colIndex], t.Grid.Cols[colIndex+1:]...)
-
+	
 	// 删除每行的对应单元格
 	for i := range t.Rows {
 		t.Rows[i].Cells = append(t.Rows[i].Cells[:colIndex], t.Rows[i].Cells[colIndex+1:]...)
 	}
-
+	
 	Info(fmt.Sprintf("删除第%d列成功", colIndex))
 	return nil
 }
@@ -530,25 +534,25 @@ func (t *Table) DeleteColumns(startIndex, endIndex int) error {
 	if len(t.Rows) == 0 {
 		return fmt.Errorf("表格没有行")
 	}
-
+	
 	colCount := len(t.Rows[0].Cells)
 	if startIndex < 0 || endIndex >= colCount || startIndex > endIndex {
 		return fmt.Errorf("列索引范围无效：[%d, %d]，表格共有%d列", startIndex, endIndex, colCount)
 	}
-
+	
 	deleteCount := endIndex - startIndex + 1
 	if colCount-deleteCount < 1 {
 		return fmt.Errorf("删除后表格至少需要保留一列")
 	}
-
+	
 	// 删除网格列范围
 	t.Grid.Cols = append(t.Grid.Cols[:startIndex], t.Grid.Cols[endIndex+1:]...)
-
+	
 	// 删除每行的对应单元格范围
 	for i := range t.Rows {
 		t.Rows[i].Cells = append(t.Rows[i].Cells[:startIndex], t.Rows[i].Cells[endIndex+1:]...)
 	}
-
+	
 	Info(fmt.Sprintf("删除第%d到%d列成功", startIndex, endIndex))
 	return nil
 }
@@ -558,11 +562,11 @@ func (t *Table) GetCell(row, col int) (*TableCell, error) {
 	if row < 0 || row >= len(t.Rows) {
 		return nil, fmt.Errorf("行索引无效：%d，表格共有%d行", row, len(t.Rows))
 	}
-
+	
 	if col < 0 || col >= len(t.Rows[row].Cells) {
 		return nil, fmt.Errorf("列索引无效：%d，第%d行共有%d列", col, row, len(t.Rows[row].Cells))
 	}
-
+	
 	return &t.Rows[row].Cells[col], nil
 }
 
@@ -572,7 +576,7 @@ func (t *Table) SetCellText(row, col int, text string) error {
 	if err != nil {
 		return err
 	}
-
+	
 	// 确保单元格有段落和运行
 	if len(cell.Paragraphs) == 0 {
 		cell.Paragraphs = []Paragraph{
@@ -595,7 +599,7 @@ func (t *Table) SetCellText(row, col int, text string) error {
 			cell.Paragraphs[0].Runs[0].Text.Content = text
 		}
 	}
-
+	
 	return nil
 }
 
@@ -605,11 +609,11 @@ func (t *Table) GetCellText(row, col int) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
+	
 	if len(cell.Paragraphs) == 0 || len(cell.Paragraphs[0].Runs) == 0 {
 		return "", nil
 	}
-
+	
 	return cell.Paragraphs[0].Runs[0].Text.Content, nil
 }
 
@@ -652,27 +656,27 @@ func (t *Table) CopyTable() *Table {
 		Grid:       t.Grid,
 		Rows:       make([]TableRow, len(t.Rows)),
 	}
-
+	
 	// 复制所有行和单元格
 	for i, row := range t.Rows {
 		newTable.Rows[i] = TableRow{
 			Properties: row.Properties,
 			Cells:      make([]TableCell, len(row.Cells)),
 		}
-
+		
 		for j, cell := range row.Cells {
 			newTable.Rows[i].Cells[j] = TableCell{
 				Properties: cell.Properties,
 				Paragraphs: make([]Paragraph, len(cell.Paragraphs)),
 			}
-
+			
 			// 复制段落内容
 			for k, para := range cell.Paragraphs {
 				newTable.Rows[i].Cells[j].Paragraphs[k] = Paragraph{
 					Properties: para.Properties,
 					Runs:       make([]Run, len(para.Runs)),
 				}
-
+				
 				for l, run := range para.Runs {
 					newTable.Rows[i].Cells[j].Paragraphs[k].Runs[l] = Run{
 						Properties: run.Properties,
@@ -682,7 +686,7 @@ func (t *Table) CopyTable() *Table {
 			}
 		}
 	}
-
+	
 	Info("表格复制成功")
 	return newTable
 }
@@ -748,31 +752,31 @@ func (t *Table) SetCellFormat(row, col int, format *CellFormat) error {
 	if err != nil {
 		return err
 	}
-
+	
 	// 确保单元格有属性
 	if cell.Properties == nil {
 		cell.Properties = &TableCellProperties{}
 	}
-
+	
 	// 设置垂直对齐
 	if format.VerticalAlign != "" {
 		cell.Properties.VAlign = &VAlign{
 			Val: string(format.VerticalAlign),
 		}
 	}
-
+	
 	// 设置文字方向
 	if format.TextDirection != "" {
 		cell.Properties.TextDirection = &TextDirection{
 			Val: string(format.TextDirection),
 		}
 	}
-
+	
 	// 确保单元格有段落
 	if len(cell.Paragraphs) == 0 {
 		cell.Paragraphs = []Paragraph{{}}
 	}
-
+	
 	// 设置水平对齐
 	if format.HorizontalAlign != "" {
 		if cell.Paragraphs[0].Properties == nil {
@@ -782,43 +786,43 @@ func (t *Table) SetCellFormat(row, col int, format *CellFormat) error {
 			Val: string(format.HorizontalAlign),
 		}
 	}
-
+	
 	// 设置文字格式
 	if format.TextFormat != nil {
 		// 确保有运行
 		if len(cell.Paragraphs[0].Runs) == 0 {
 			cell.Paragraphs[0].Runs = []Run{{}}
 		}
-
+		
 		run := &cell.Paragraphs[0].Runs[0]
 		if run.Properties == nil {
 			run.Properties = &RunProperties{}
 		}
-
+		
 		// 设置粗体
 		if format.TextFormat.Bold {
 			run.Properties.Bold = &Bold{}
 		}
-
+		
 		// 设置斜体
 		if format.TextFormat.Italic {
 			run.Properties.Italic = &Italic{}
 		}
-
+		
 		// 设置字体大小
 		if format.TextFormat.FontSize > 0 {
 			run.Properties.FontSize = &FontSize{
 				Val: fmt.Sprintf("%d", format.TextFormat.FontSize*2), // Word使用半磅为单位
 			}
 		}
-
+		
 		// 设置字体颜色
 		if format.TextFormat.FontColor != "" {
 			run.Properties.Color = &Color{
 				Val: format.TextFormat.FontColor,
 			}
 		}
-
+		
 		// 设置字体名称
 		if format.TextFormat.FontFamily != "" {
 			run.Properties.FontFamily = &FontFamily{
@@ -826,7 +830,7 @@ func (t *Table) SetCellFormat(row, col int, format *CellFormat) error {
 			}
 		}
 	}
-
+	
 	Info(fmt.Sprintf("设置单元格(%d,%d)格式成功", row, col))
 	return nil
 }
@@ -837,49 +841,49 @@ func (t *Table) SetCellFormattedText(row, col int, text string, format *TextForm
 	if err != nil {
 		return err
 	}
-
+	
 	// 创建格式化的运行
 	run := Run{
 		Text: Text{Content: text},
 	}
-
+	
 	if format != nil {
 		run.Properties = &RunProperties{}
-
+		
 		if format.FontFamily != "" {
 			run.Properties.FontFamily = &FontFamily{
 				ASCII: format.FontFamily,
 			}
 		}
-
+		
 		if format.Bold {
 			run.Properties.Bold = &Bold{}
 		}
-
+		
 		if format.Italic {
 			run.Properties.Italic = &Italic{}
 		}
-
+		
 		if format.FontColor != "" {
 			run.Properties.Color = &Color{
 				Val: format.FontColor,
 			}
 		}
-
+		
 		if format.FontSize > 0 {
 			run.Properties.FontSize = &FontSize{
 				Val: fmt.Sprintf("%d", format.FontSize*2),
 			}
 		}
 	}
-
+	
 	// 设置单元格内容
 	cell.Paragraphs = []Paragraph{
 		{
 			Runs: []Run{run},
 		},
 	}
-
+	
 	Info(fmt.Sprintf("设置单元格(%d,%d)富文本内容成功", row, col))
 	return nil
 }
@@ -890,50 +894,50 @@ func (t *Table) AddCellFormattedText(row, col int, text string, format *TextForm
 	if err != nil {
 		return err
 	}
-
+	
 	// 确保单元格有段落
 	if len(cell.Paragraphs) == 0 {
 		cell.Paragraphs = []Paragraph{{}}
 	}
-
+	
 	// 创建格式化的运行
 	run := Run{
 		Text: Text{Content: text},
 	}
-
+	
 	if format != nil {
 		run.Properties = &RunProperties{}
-
+		
 		if format.FontFamily != "" {
 			run.Properties.FontFamily = &FontFamily{
 				ASCII: format.FontFamily,
 			}
 		}
-
+		
 		if format.Bold {
 			run.Properties.Bold = &Bold{}
 		}
-
+		
 		if format.Italic {
 			run.Properties.Italic = &Italic{}
 		}
-
+		
 		if format.FontColor != "" {
 			run.Properties.Color = &Color{
 				Val: format.FontColor,
 			}
 		}
-
+		
 		if format.FontSize > 0 {
 			run.Properties.FontSize = &FontSize{
 				Val: fmt.Sprintf("%d", format.FontSize*2),
 			}
 		}
 	}
-
+	
 	// 添加运行到第一个段落
 	cell.Paragraphs[0].Runs = append(cell.Paragraphs[0].Runs, run)
-
+	
 	Info(fmt.Sprintf("添加格式化文本到单元格(%d,%d)成功", row, col))
 	return nil
 }
@@ -943,26 +947,26 @@ func (t *Table) MergeCellsHorizontal(row, startCol, endCol int) error {
 	if row < 0 || row >= len(t.Rows) {
 		return fmt.Errorf("行索引无效：%d", row)
 	}
-
+	
 	if startCol < 0 || endCol >= len(t.Rows[row].Cells) || startCol > endCol {
 		return fmt.Errorf("列索引范围无效：[%d, %d]", startCol, endCol)
 	}
-
+	
 	if startCol == endCol {
 		return fmt.Errorf("起始列和结束列不能相同")
 	}
-
+	
 	// 设置起始单元格的网格跨度
 	startCell := &t.Rows[row].Cells[startCol]
 	if startCell.Properties == nil {
 		startCell.Properties = &TableCellProperties{}
 	}
-
+	
 	spanCount := endCol - startCol + 1
 	startCell.Properties.GridSpan = &GridSpan{
 		Val: fmt.Sprintf("%d", spanCount),
 	}
-
+	
 	// 删除被合并的单元格
 	newCells := make([]TableCell, 0, len(t.Rows[row].Cells)-(endCol-startCol))
 	newCells = append(newCells, t.Rows[row].Cells[:startCol+1]...)
@@ -970,7 +974,7 @@ func (t *Table) MergeCellsHorizontal(row, startCol, endCol int) error {
 		newCells = append(newCells, t.Rows[row].Cells[endCol+1:]...)
 	}
 	t.Rows[row].Cells = newCells
-
+	
 	Info(fmt.Sprintf("水平合并单元格：行%d，列%d到%d", row, startCol, endCol))
 	return nil
 }
@@ -980,22 +984,22 @@ func (t *Table) MergeCellsVertical(startRow, endRow, col int) error {
 	if startRow < 0 || endRow >= len(t.Rows) || startRow > endRow {
 		return fmt.Errorf("行索引范围无效：[%d, %d]", startRow, endRow)
 	}
-
+	
 	if col < 0 {
 		return fmt.Errorf("列索引无效：%d", col)
 	}
-
+	
 	if startRow == endRow {
 		return fmt.Errorf("起始行和结束行不能相同")
 	}
-
+	
 	// 检查所有行的列数
 	for i := startRow; i <= endRow; i++ {
 		if col >= len(t.Rows[i].Cells) {
 			return fmt.Errorf("第%d行没有第%d列", i, col)
 		}
 	}
-
+	
 	// 设置起始单元格为合并起始
 	startCell := &t.Rows[startRow].Cells[col]
 	if startCell.Properties == nil {
@@ -1004,7 +1008,7 @@ func (t *Table) MergeCellsVertical(startRow, endRow, col int) error {
 	startCell.Properties.VMerge = &VMerge{
 		Val: "restart",
 	}
-
+	
 	// 设置后续单元格为合并继续
 	for i := startRow + 1; i <= endRow; i++ {
 		cell := &t.Rows[i].Cells[col]
@@ -1017,7 +1021,7 @@ func (t *Table) MergeCellsVertical(startRow, endRow, col int) error {
 		// 清空被合并单元格的内容
 		cell.Paragraphs = []Paragraph{{}}
 	}
-
+	
 	Info(fmt.Sprintf("垂直合并单元格：行%d到%d，列%d", startRow, endRow, col))
 	return nil
 }
@@ -1028,13 +1032,13 @@ func (t *Table) MergeCellsRange(startRow, endRow, startCol, endCol int) error {
 	if startRow < 0 || endRow >= len(t.Rows) || startRow > endRow {
 		return fmt.Errorf("行索引范围无效：[%d, %d]", startRow, endRow)
 	}
-
+	
 	// 先水平合并每一行
 	for i := startRow; i <= endRow; i++ {
 		if startCol >= len(t.Rows[i].Cells) || endCol >= len(t.Rows[i].Cells) {
 			return fmt.Errorf("第%d行列索引范围无效：[%d, %d]", i, startCol, endCol)
 		}
-
+		
 		if startCol != endCol {
 			err := t.MergeCellsHorizontal(i, startCol, endCol)
 			if err != nil {
@@ -1042,7 +1046,7 @@ func (t *Table) MergeCellsRange(startRow, endRow, startCol, endCol int) error {
 			}
 		}
 	}
-
+	
 	// 然后垂直合并第一列
 	if startRow != endRow {
 		err := t.MergeCellsVertical(startRow, endRow, startCol)
@@ -1050,7 +1054,7 @@ func (t *Table) MergeCellsRange(startRow, endRow, startCol, endCol int) error {
 			return fmt.Errorf("垂直合并失败：%v", err)
 		}
 	}
-
+	
 	Info(fmt.Sprintf("合并单元格区域：行%d到%d，列%d到%d", startRow, endRow, startCol, endCol))
 	return nil
 }
@@ -1061,11 +1065,11 @@ func (t *Table) UnmergeCells(row, col int) error {
 	if err != nil {
 		return err
 	}
-
+	
 	if cell.Properties == nil {
 		return fmt.Errorf("单元格没有合并")
 	}
-
+	
 	// 检查是否有水平合并
 	if cell.Properties.GridSpan != nil {
 		// 获取合并的列数
@@ -1073,7 +1077,7 @@ func (t *Table) UnmergeCells(row, col int) error {
 		if cell.Properties.GridSpan.Val != "" {
 			fmt.Sscanf(cell.Properties.GridSpan.Val, "%d", &spanCount)
 		}
-
+		
 		// 插入被合并的单元格
 		for i := 1; i < spanCount; i++ {
 			newCell := TableCell{
@@ -1083,23 +1087,23 @@ func (t *Table) UnmergeCells(row, col int) error {
 				},
 				Paragraphs: []Paragraph{{}},
 			}
-
+			
 			// 在指定位置插入新单元格
 			insertPos := col + i
 			if insertPos <= len(t.Rows[row].Cells) {
 				t.Rows[row].Cells = append(t.Rows[row].Cells[:insertPos], append([]TableCell{newCell}, t.Rows[row].Cells[insertPos:]...)...)
 			}
 		}
-
+		
 		// 移除水平合并属性
 		cell.Properties.GridSpan = nil
 	}
-
+	
 	// 检查是否有垂直合并
 	if cell.Properties.VMerge != nil {
 		// 移除垂直合并属性
 		cell.Properties.VMerge = nil
-
+		
 		// 查找并恢复被合并的单元格
 		for i := row + 1; i < len(t.Rows); i++ {
 			if col < len(t.Rows[i].Cells) {
@@ -1120,7 +1124,7 @@ func (t *Table) UnmergeCells(row, col int) error {
 			}
 		}
 	}
-
+	
 	Info(fmt.Sprintf("取消单元格(%d,%d)合并成功", row, col))
 	return nil
 }
@@ -1131,21 +1135,21 @@ func (t *Table) IsCellMerged(row, col int) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-
+	
 	if cell.Properties == nil {
 		return false, nil
 	}
-
+	
 	// 检查水平合并
 	if cell.Properties.GridSpan != nil && cell.Properties.GridSpan.Val != "" && cell.Properties.GridSpan.Val != "1" {
 		return true, nil
 	}
-
+	
 	// 检查垂直合并
 	if cell.Properties.VMerge != nil {
 		return true, nil
 	}
-
+	
 	return false, nil
 }
 
@@ -1155,14 +1159,14 @@ func (t *Table) GetMergedCellInfo(row, col int) (map[string]interface{}, error) 
 	if err != nil {
 		return nil, err
 	}
-
+	
 	info := make(map[string]interface{})
 	info["is_merged"] = false
-
+	
 	if cell.Properties == nil {
 		return info, nil
 	}
-
+	
 	// 检查水平合并
 	if cell.Properties.GridSpan != nil && cell.Properties.GridSpan.Val != "" {
 		spanCount := 1
@@ -1173,7 +1177,7 @@ func (t *Table) GetMergedCellInfo(row, col int) (map[string]interface{}, error) 
 			info["merge_type"] = "horizontal"
 		}
 	}
-
+	
 	// 检查垂直合并
 	if cell.Properties.VMerge != nil {
 		info["is_merged"] = true
@@ -1185,7 +1189,7 @@ func (t *Table) GetMergedCellInfo(row, col int) (map[string]interface{}, error) 
 			info["merge_type"] = "vertical"
 		}
 	}
-
+	
 	return info, nil
 }
 
@@ -1195,14 +1199,14 @@ func (t *Table) ClearCellContent(row, col int) error {
 	if err != nil {
 		return err
 	}
-
+	
 	// 保留格式，只清空文本内容
 	for i := range cell.Paragraphs {
 		for j := range cell.Paragraphs[i].Runs {
 			cell.Paragraphs[i].Runs[j].Text.Content = ""
 		}
 	}
-
+	
 	Info(fmt.Sprintf("清空单元格(%d,%d)内容成功", row, col))
 	return nil
 }
@@ -1213,21 +1217,21 @@ func (t *Table) ClearCellFormat(row, col int) error {
 	if err != nil {
 		return err
 	}
-
+	
 	// 清除单元格属性中的格式
 	if cell.Properties != nil {
 		// 保留合并信息和基本宽度，清除其他格式
 		oldGridSpan := cell.Properties.GridSpan
 		oldVMerge := cell.Properties.VMerge
 		oldWidth := cell.Properties.TableCellW
-
+		
 		cell.Properties = &TableCellProperties{
 			TableCellW: oldWidth,
 			GridSpan:   oldGridSpan,
 			VMerge:     oldVMerge,
 		}
 	}
-
+	
 	// 清除段落和运行的格式
 	for i := range cell.Paragraphs {
 		cell.Paragraphs[i].Properties = nil
@@ -1235,7 +1239,7 @@ func (t *Table) ClearCellFormat(row, col int) error {
 			cell.Paragraphs[i].Runs[j].Properties = nil
 		}
 	}
-
+	
 	Info(fmt.Sprintf("清空单元格(%d,%d)格式成功", row, col))
 	return nil
 }
@@ -1246,7 +1250,7 @@ func (t *Table) SetCellPadding(row, col int, padding int) error {
 	if err != nil {
 		return err
 	}
-
+	
 	// 单元格内边距通过表格属性设置，这里先预留接口
 	// 实际实现需要在表格级别设置默认内边距
 	Info(fmt.Sprintf("设置单元格(%d,%d)内边距为%d磅", row, col, padding))
@@ -1259,17 +1263,17 @@ func (t *Table) SetCellTextDirection(row, col int, direction CellTextDirection) 
 	if err != nil {
 		return err
 	}
-
+	
 	// 确保单元格有属性
 	if cell.Properties == nil {
 		cell.Properties = &TableCellProperties{}
 	}
-
+	
 	// 设置文字方向
 	cell.Properties.TextDirection = &TextDirection{
 		Val: string(direction),
 	}
-
+	
 	Info(fmt.Sprintf("设置单元格(%d,%d)文字方向为%s", row, col, direction))
 	return nil
 }
@@ -1280,11 +1284,11 @@ func (t *Table) GetCellTextDirection(row, col int) (CellTextDirection, error) {
 	if err != nil {
 		return TextDirectionLR, err
 	}
-
+	
 	if cell.Properties != nil && cell.Properties.TextDirection != nil {
 		return CellTextDirection(cell.Properties.TextDirection.Val), nil
 	}
-
+	
 	// 默认返回从左到右
 	return TextDirectionLR, nil
 }
@@ -1295,53 +1299,53 @@ func (t *Table) GetCellFormat(row, col int) (*CellFormat, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	
 	format := &CellFormat{}
-
+	
 	// 获取垂直对齐
 	if cell.Properties != nil && cell.Properties.VAlign != nil {
 		format.VerticalAlign = CellVerticalAlignment(cell.Properties.VAlign.Val)
 	}
-
+	
 	// 获取文字方向
 	if cell.Properties != nil && cell.Properties.TextDirection != nil {
 		format.TextDirection = CellTextDirection(cell.Properties.TextDirection.Val)
 	}
-
+	
 	// 获取水平对齐
 	if len(cell.Paragraphs) > 0 && cell.Paragraphs[0].Properties != nil && cell.Paragraphs[0].Properties.Justification != nil {
 		format.HorizontalAlign = CellAlignment(cell.Paragraphs[0].Properties.Justification.Val)
 	}
-
+	
 	// 获取文字格式
 	if len(cell.Paragraphs) > 0 && len(cell.Paragraphs[0].Runs) > 0 {
 		run := &cell.Paragraphs[0].Runs[0]
 		if run.Properties != nil {
 			format.TextFormat = &TextFormat{}
-
+			
 			if run.Properties.Bold != nil {
 				format.TextFormat.Bold = true
 			}
-
+			
 			if run.Properties.Italic != nil {
 				format.TextFormat.Italic = true
 			}
-
+			
 			if run.Properties.FontSize != nil {
 				fmt.Sscanf(run.Properties.FontSize.Val, "%d", &format.TextFormat.FontSize)
 				format.TextFormat.FontSize /= 2 // 转换为磅
 			}
-
+			
 			if run.Properties.Color != nil {
 				format.TextFormat.FontColor = run.Properties.Color.Val
 			}
-
+			
 			if run.Properties.FontFamily != nil {
 				format.TextFormat.FontFamily = run.Properties.FontFamily.ASCII
 			}
 		}
 	}
-
+	
 	return format, nil
 }
 
@@ -1374,18 +1378,18 @@ func (t *Table) SetRowHeight(rowIndex int, config *RowHeightConfig) error {
 	if rowIndex < 0 || rowIndex >= len(t.Rows) {
 		return fmt.Errorf("行索引无效：%d，表格共有%d行", rowIndex, len(t.Rows))
 	}
-
+	
 	row := &t.Rows[rowIndex]
 	if row.Properties == nil {
 		row.Properties = &TableRowProperties{}
 	}
-
+	
 	// 设置行高属性
 	row.Properties.TableRowH = &TableRowH{
 		Val:   fmt.Sprintf("%d", config.Height*20), // 转换为twips (1磅=20twips)
 		HRule: string(config.Rule),
 	}
-
+	
 	Info(fmt.Sprintf("设置第%d行高度为%d磅，规则为%s", rowIndex, config.Height, config.Rule))
 	return nil
 }
@@ -1395,7 +1399,7 @@ func (t *Table) GetRowHeight(rowIndex int) (*RowHeightConfig, error) {
 	if rowIndex < 0 || rowIndex >= len(t.Rows) {
 		return nil, fmt.Errorf("行索引无效：%d，表格共有%d行", rowIndex, len(t.Rows))
 	}
-
+	
 	row := &t.Rows[rowIndex]
 	if row.Properties == nil || row.Properties.TableRowH == nil {
 		// 返回默认自动高度
@@ -1404,18 +1408,18 @@ func (t *Table) GetRowHeight(rowIndex int) (*RowHeightConfig, error) {
 			Rule:   RowHeightAuto,
 		}, nil
 	}
-
+	
 	height := 0
 	if row.Properties.TableRowH.Val != "" {
 		fmt.Sscanf(row.Properties.TableRowH.Val, "%d", &height)
 		height /= 20 // 转换为磅
 	}
-
+	
 	rule := RowHeightAuto
 	if row.Properties.TableRowH.HRule != "" {
 		rule = RowHeightRule(row.Properties.TableRowH.HRule)
 	}
-
+	
 	return &RowHeightConfig{
 		Height: height,
 		Rule:   rule,
@@ -1427,14 +1431,14 @@ func (t *Table) SetRowHeightRange(startRow, endRow int, config *RowHeightConfig)
 	if startRow < 0 || endRow >= len(t.Rows) || startRow > endRow {
 		return fmt.Errorf("行索引范围无效：[%d, %d]，表格共有%d行", startRow, endRow, len(t.Rows))
 	}
-
+	
 	for i := startRow; i <= endRow; i++ {
 		err := t.SetRowHeight(i, config)
 		if err != nil {
 			return fmt.Errorf("设置第%d行高度失败：%v", i, err)
 		}
 	}
-
+	
 	Info(fmt.Sprintf("批量设置第%d到%d行高度成功", startRow, endRow))
 	return nil
 }
@@ -1503,14 +1507,14 @@ func (t *Table) SetTableLayout(config *TableLayoutConfig) error {
 	if t.Properties == nil {
 		t.Properties = &TableProperties{}
 	}
-
+	
 	// 设置表格对齐
 	if config.Alignment != "" {
 		t.Properties.TableJc = &TableJc{
 			Val: string(config.Alignment),
 		}
 	}
-
+	
 	// 设置定位属性（仅在浮动定位时生效）
 	if config.Position == PositionFloating && config.Positioning != nil {
 		// 在OOXML中，浮动表格定位需要特殊的TablePositioning属性
@@ -1518,7 +1522,7 @@ func (t *Table) SetTableLayout(config *TableLayoutConfig) error {
 		Info("设置表格为浮动定位模式")
 		// 注意：完整的浮动定位实现需要更复杂的XML结构支持
 	}
-
+	
 	Info(fmt.Sprintf("设置表格布局：对齐=%s，环绕=%s，定位=%s",
 		config.Alignment, config.TextWrap, config.Position))
 	return nil
@@ -1531,11 +1535,11 @@ func (t *Table) GetTableLayout() *TableLayoutConfig {
 		TextWrap:  TextWrapNone,
 		Position:  PositionInline,
 	}
-
+	
 	if t.Properties != nil && t.Properties.TableJc != nil {
 		config.Alignment = TableAlignment(t.Properties.TableJc.Val)
 	}
-
+	
 	return config
 }
 
@@ -1585,12 +1589,12 @@ func (t *Table) SetRowKeepTogether(rowIndex int, keepTogether bool) error {
 	if rowIndex < 0 || rowIndex >= len(t.Rows) {
 		return fmt.Errorf("行索引无效：%d，表格共有%d行", rowIndex, len(t.Rows))
 	}
-
+	
 	row := &t.Rows[rowIndex]
 	if row.Properties == nil {
 		row.Properties = &TableRowProperties{}
 	}
-
+	
 	if keepTogether {
 		row.Properties.CantSplit = &CantSplit{
 			Val: "1",
@@ -1598,7 +1602,7 @@ func (t *Table) SetRowKeepTogether(rowIndex int, keepTogether bool) error {
 	} else {
 		row.Properties.CantSplit = nil
 	}
-
+	
 	Info(fmt.Sprintf("设置第%d行跨页分割为：%t", rowIndex, !keepTogether))
 	return nil
 }
@@ -1608,12 +1612,12 @@ func (t *Table) SetRowAsHeader(rowIndex int, isHeader bool) error {
 	if rowIndex < 0 || rowIndex >= len(t.Rows) {
 		return fmt.Errorf("行索引无效：%d，表格共有%d行", rowIndex, len(t.Rows))
 	}
-
+	
 	row := &t.Rows[rowIndex]
 	if row.Properties == nil {
 		row.Properties = &TableRowProperties{}
 	}
-
+	
 	if isHeader {
 		row.Properties.TblHeader = &TblHeader{
 			Val: "1",
@@ -1621,7 +1625,7 @@ func (t *Table) SetRowAsHeader(rowIndex int, isHeader bool) error {
 	} else {
 		row.Properties.TblHeader = nil
 	}
-
+	
 	Info(fmt.Sprintf("设置第%d行为标题行：%t", rowIndex, isHeader))
 	return nil
 }
@@ -1631,14 +1635,14 @@ func (t *Table) SetHeaderRows(startRow, endRow int) error {
 	if startRow < 0 || endRow >= len(t.Rows) || startRow > endRow {
 		return fmt.Errorf("行索引范围无效：[%d, %d]，表格共有%d行", startRow, endRow, len(t.Rows))
 	}
-
+	
 	// 清除所有现有的标题行设置
 	for i := range t.Rows {
 		if t.Rows[i].Properties != nil {
 			t.Rows[i].Properties.TblHeader = nil
 		}
 	}
-
+	
 	// 设置指定范围为标题行
 	for i := startRow; i <= endRow; i++ {
 		err := t.SetRowAsHeader(i, true)
@@ -1646,7 +1650,7 @@ func (t *Table) SetHeaderRows(startRow, endRow int) error {
 			return fmt.Errorf("设置第%d行为标题行失败：%v", i, err)
 		}
 	}
-
+	
 	Info(fmt.Sprintf("设置第%d到%d行为标题行", startRow, endRow))
 	return nil
 }
@@ -1656,12 +1660,12 @@ func (t *Table) IsRowHeader(rowIndex int) (bool, error) {
 	if rowIndex < 0 || rowIndex >= len(t.Rows) {
 		return false, fmt.Errorf("行索引无效：%d，表格共有%d行", rowIndex, len(t.Rows))
 	}
-
+	
 	row := &t.Rows[rowIndex]
 	if row.Properties != nil && row.Properties.TblHeader != nil {
 		return row.Properties.TblHeader.Val == "1", nil
 	}
-
+	
 	return false, nil
 }
 
@@ -1670,12 +1674,12 @@ func (t *Table) IsRowKeepTogether(rowIndex int) (bool, error) {
 	if rowIndex < 0 || rowIndex >= len(t.Rows) {
 		return false, fmt.Errorf("行索引无效：%d，表格共有%d行", rowIndex, len(t.Rows))
 	}
-
+	
 	row := &t.Rows[rowIndex]
 	if row.Properties != nil && row.Properties.CantSplit != nil {
 		return row.Properties.CantSplit.Val == "1", nil
 	}
-
+	
 	return false, nil
 }
 
@@ -1701,7 +1705,7 @@ func (t *Table) SetRowKeepWithNext(rowIndex int, keepWithNext bool) error {
 	if rowIndex < 0 || rowIndex >= len(t.Rows) {
 		return fmt.Errorf("行索引无效：%d，表格共有%d行", rowIndex, len(t.Rows))
 	}
-
+	
 	// 这个功能需要在行属性中设置特定的分页属性
 	// 实际实现时需要扩展TableRowProperties结构
 	Info(fmt.Sprintf("设置第%d行与下一行保持在同一页：%t", rowIndex, keepWithNext))
@@ -1711,26 +1715,26 @@ func (t *Table) SetRowKeepWithNext(rowIndex int, keepWithNext bool) error {
 // GetTableBreakInfo 获取表格分页信息
 func (t *Table) GetTableBreakInfo() map[string]interface{} {
 	info := make(map[string]interface{})
-
+	
 	headerRowCount := 0
 	keepTogetherCount := 0
-
+	
 	for i := range t.Rows {
 		isHeader, _ := t.IsRowHeader(i)
 		if isHeader {
 			headerRowCount++
 		}
-
+		
 		keepTogether, _ := t.IsRowKeepTogether(i)
 		if keepTogether {
 			keepTogetherCount++
 		}
 	}
-
+	
 	info["total_rows"] = len(t.Rows)
 	info["header_rows"] = headerRowCount
 	info["keep_together_rows"] = keepTogetherCount
-
+	
 	return info
 }
 
@@ -2012,7 +2016,7 @@ func (t *Table) ApplyTableStyle(config *TableStyleConfig) error {
 	if t.Properties == nil {
 		t.Properties = &TableProperties{}
 	}
-
+	
 	// 设置样式模板
 	if config.Template != "" {
 		t.Properties.TableStyle = &TableStyle{
@@ -2023,12 +2027,12 @@ func (t *Table) ApplyTableStyle(config *TableStyleConfig) error {
 			Val: config.StyleID,
 		}
 	}
-
+	
 	// 设置表格外观选项
 	if t.Properties.TableLook == nil {
 		t.Properties.TableLook = &TableLook{}
 	}
-
+	
 	// 构建TableLook值
 	lookVal := "0000"
 	if config.FirstRowHeader {
@@ -2037,7 +2041,7 @@ func (t *Table) ApplyTableStyle(config *TableStyleConfig) error {
 	} else {
 		t.Properties.TableLook.FirstRow = "0"
 	}
-
+	
 	if config.LastRowTotal {
 		t.Properties.TableLook.LastRow = "1"
 		if lookVal == "0400" {
@@ -2048,7 +2052,7 @@ func (t *Table) ApplyTableStyle(config *TableStyleConfig) error {
 	} else {
 		t.Properties.TableLook.LastRow = "0"
 	}
-
+	
 	if config.FirstColumnHeader {
 		t.Properties.TableLook.FirstCol = "1"
 		switch lookVal {
@@ -2064,27 +2068,27 @@ func (t *Table) ApplyTableStyle(config *TableStyleConfig) error {
 	} else {
 		t.Properties.TableLook.FirstCol = "0"
 	}
-
+	
 	if config.LastColumnTotal {
 		t.Properties.TableLook.LastCol = "1"
 	} else {
 		t.Properties.TableLook.LastCol = "0"
 	}
-
+	
 	if config.BandedRows {
 		t.Properties.TableLook.NoHBand = "0"
 	} else {
 		t.Properties.TableLook.NoHBand = "1"
 	}
-
+	
 	if config.BandedColumns {
 		t.Properties.TableLook.NoVBand = "0"
 	} else {
 		t.Properties.TableLook.NoVBand = "1"
 	}
-
+	
 	t.Properties.TableLook.Val = lookVal
-
+	
 	Info(fmt.Sprintf("应用表格样式成功：%s", config.Template))
 	return nil
 }
@@ -2094,9 +2098,9 @@ func (t *Table) SetTableBorders(config *TableBorderConfig) error {
 	if t.Properties == nil {
 		t.Properties = &TableProperties{}
 	}
-
+	
 	t.Properties.TableBorders = &TableBorders{}
-
+	
 	if config.Top != nil {
 		t.Properties.TableBorders.Top = createTableBorder(config.Top)
 	}
@@ -2115,7 +2119,7 @@ func (t *Table) SetTableBorders(config *TableBorderConfig) error {
 	if config.InsideV != nil {
 		t.Properties.TableBorders.InsideV = createTableBorder(config.InsideV)
 	}
-
+	
 	Info("设置表格边框成功")
 	return nil
 }
@@ -2125,13 +2129,13 @@ func (t *Table) SetTableShading(config *ShadingConfig) error {
 	if t.Properties == nil {
 		t.Properties = &TableProperties{}
 	}
-
+	
 	t.Properties.Shd = &TableShading{
 		Val:   string(config.Pattern),
 		Color: config.ForegroundColor,
 		Fill:  config.BackgroundColor,
 	}
-
+	
 	Info("设置表格背景成功")
 	return nil
 }
@@ -2142,13 +2146,13 @@ func (t *Table) SetCellBorders(row, col int, config *CellBorderConfig) error {
 	if err != nil {
 		return err
 	}
-
+	
 	if cell.Properties == nil {
 		cell.Properties = &TableCellProperties{}
 	}
-
+	
 	cell.Properties.TcBorders = &TableCellBorders{}
-
+	
 	if config.Top != nil {
 		cell.Properties.TcBorders.Top = createTableCellBorder(config.Top)
 	}
@@ -2167,7 +2171,7 @@ func (t *Table) SetCellBorders(row, col int, config *CellBorderConfig) error {
 	if config.DiagUp != nil {
 		cell.Properties.TcBorders.TR2BL = createTableCellBorder(config.DiagUp)
 	}
-
+	
 	Info(fmt.Sprintf("设置单元格(%d,%d)边框成功", row, col))
 	return nil
 }
@@ -2178,17 +2182,17 @@ func (t *Table) SetCellShading(row, col int, config *ShadingConfig) error {
 	if err != nil {
 		return err
 	}
-
+	
 	if cell.Properties == nil {
 		cell.Properties = &TableCellProperties{}
 	}
-
+	
 	cell.Properties.Shd = &TableCellShading{
 		Val:   string(config.Pattern),
 		Color: config.ForegroundColor,
 		Fill:  config.BackgroundColor,
 	}
-
+	
 	Info(fmt.Sprintf("设置单元格(%d,%d)背景成功", row, col))
 	return nil
 }
@@ -2202,7 +2206,7 @@ func (t *Table) SetAlternatingRowColors(evenRowColor, oddRowColor string) error 
 		} else {
 			bgColor = oddRowColor
 		}
-
+		
 		// 为该行的所有单元格设置背景色
 		for j := range t.Rows[i].Cells {
 			err := t.SetCellShading(i, j, &ShadingConfig{
@@ -2214,7 +2218,7 @@ func (t *Table) SetAlternatingRowColors(evenRowColor, oddRowColor string) error 
 			}
 		}
 	}
-
+	
 	Info("设置奇偶行颜色交替成功")
 	return nil
 }
@@ -2224,7 +2228,7 @@ func (t *Table) RemoveTableBorders() error {
 	if t.Properties == nil {
 		t.Properties = &TableProperties{}
 	}
-
+	
 	// 设置所有边框为无
 	noBorderConfig := &BorderConfig{
 		Style: BorderStyleNone,
@@ -2232,7 +2236,7 @@ func (t *Table) RemoveTableBorders() error {
 		Color: "auto",
 		Space: 0,
 	}
-
+	
 	borderConfig := &TableBorderConfig{
 		Top:     noBorderConfig,
 		Left:    noBorderConfig,
@@ -2241,7 +2245,7 @@ func (t *Table) RemoveTableBorders() error {
 		InsideH: noBorderConfig,
 		InsideV: noBorderConfig,
 	}
-
+	
 	return t.SetTableBorders(borderConfig)
 }
 
@@ -2253,14 +2257,14 @@ func (t *Table) RemoveCellBorders(row, col int) error {
 		Color: "auto",
 		Space: 0,
 	}
-
+	
 	cellBorderConfig := &CellBorderConfig{
 		Top:    noBorderConfig,
 		Left:   noBorderConfig,
 		Bottom: noBorderConfig,
 		Right:  noBorderConfig,
 	}
-
+	
 	return t.SetCellBorders(row, col, cellBorderConfig)
 }
 
@@ -2269,19 +2273,19 @@ func (t *Table) CreateCustomTableStyle(styleID, styleName string,
 	borderConfig *TableBorderConfig,
 	shadingConfig *ShadingConfig,
 	firstRowBold bool) error {
-
+	
 	// 应用样式到表格
 	config := &TableStyleConfig{
 		StyleID:        styleID,
 		FirstRowHeader: firstRowBold,
 		BandedRows:     shadingConfig != nil,
 	}
-
+	
 	err := t.ApplyTableStyle(config)
 	if err != nil {
 		return err
 	}
-
+	
 	// 设置边框
 	if borderConfig != nil {
 		err = t.SetTableBorders(borderConfig)
@@ -2289,7 +2293,7 @@ func (t *Table) CreateCustomTableStyle(styleID, styleName string,
 			return err
 		}
 	}
-
+	
 	// 设置背景
 	if shadingConfig != nil {
 		err = t.SetTableShading(shadingConfig)
@@ -2297,7 +2301,7 @@ func (t *Table) CreateCustomTableStyle(styleID, styleName string,
 			return err
 		}
 	}
-
+	
 	Info(fmt.Sprintf("创建自定义表格样式成功：%s", styleID))
 	return nil
 }
@@ -2347,7 +2351,7 @@ func (t *Table) NewCellIterator() *CellIterator {
 	if totalRows > 0 {
 		totalCols = t.GetColumnCount()
 	}
-
+	
 	return &CellIterator{
 		table:      t,
 		currentRow: 0,
@@ -2362,7 +2366,7 @@ func (iter *CellIterator) HasNext() bool {
 	if iter.totalRows == 0 || iter.totalCols == 0 {
 		return false
 	}
-
+	
 	// 检查当前位置是否超出范围
 	return iter.currentRow < iter.totalRows &&
 		(iter.currentRow < iter.totalRows-1 || iter.currentCol < iter.totalCols)
@@ -2373,16 +2377,16 @@ func (iter *CellIterator) Next() (*CellInfo, error) {
 	if !iter.HasNext() {
 		return nil, fmt.Errorf("没有更多单元格")
 	}
-
+	
 	// 获取当前单元格
 	cell, err := iter.table.GetCell(iter.currentRow, iter.currentCol)
 	if err != nil {
 		return nil, fmt.Errorf("获取单元格失败: %v", err)
 	}
-
+	
 	// 获取单元格文本
 	text, _ := iter.table.GetCellText(iter.currentRow, iter.currentCol)
-
+	
 	// 创建单元格信息
 	cellInfo := &CellInfo{
 		Row:  iter.currentRow,
@@ -2390,17 +2394,17 @@ func (iter *CellIterator) Next() (*CellInfo, error) {
 		Cell: cell,
 		Text: text,
 	}
-
+	
 	// 更新位置并检查是否为最后一个
 	iter.currentCol++
 	if iter.currentCol >= iter.totalCols {
 		iter.currentCol = 0
 		iter.currentRow++
 	}
-
+	
 	// 检查是否为最后一个单元格
 	cellInfo.IsLast = !iter.HasNext()
-
+	
 	return cellInfo, nil
 }
 
@@ -2425,28 +2429,28 @@ func (iter *CellIterator) Progress() float64 {
 	if iter.totalRows == 0 || iter.totalCols == 0 {
 		return 1.0
 	}
-
+	
 	processed := iter.currentRow*iter.totalCols + iter.currentCol
 	total := iter.totalRows * iter.totalCols
-
+	
 	return float64(processed) / float64(total)
 }
 
 // ForEach 遍历所有单元格，对每个单元格执行指定函数
 func (t *Table) ForEach(fn func(row, col int, cell *TableCell, text string) error) error {
 	iterator := t.NewCellIterator()
-
+	
 	for iterator.HasNext() {
 		cellInfo, err := iterator.Next()
 		if err != nil {
 			return fmt.Errorf("迭代失败: %v", err)
 		}
-
+		
 		if err := fn(cellInfo.Row, cellInfo.Col, cellInfo.Cell, cellInfo.Text); err != nil {
 			return fmt.Errorf("回调函数执行失败 (行:%d, 列:%d): %v", cellInfo.Row, cellInfo.Col, err)
 		}
 	}
-
+	
 	return nil
 }
 
@@ -2455,21 +2459,21 @@ func (t *Table) ForEachInRow(rowIndex int, fn func(col int, cell *TableCell, tex
 	if rowIndex < 0 || rowIndex >= t.GetRowCount() {
 		return fmt.Errorf("行索引无效: %d", rowIndex)
 	}
-
+	
 	colCount := t.GetColumnCount()
 	for col := 0; col < colCount; col++ {
 		cell, err := t.GetCell(rowIndex, col)
 		if err != nil {
 			return fmt.Errorf("获取单元格失败 (行:%d, 列:%d): %v", rowIndex, col, err)
 		}
-
+		
 		text, _ := t.GetCellText(rowIndex, col)
-
+		
 		if err := fn(col, cell, text); err != nil {
 			return fmt.Errorf("回调函数执行失败 (行:%d, 列:%d): %v", rowIndex, col, err)
 		}
 	}
-
+	
 	return nil
 }
 
@@ -2478,21 +2482,21 @@ func (t *Table) ForEachInColumn(colIndex int, fn func(row int, cell *TableCell, 
 	if colIndex < 0 || colIndex >= t.GetColumnCount() {
 		return fmt.Errorf("列索引无效: %d", colIndex)
 	}
-
+	
 	rowCount := t.GetRowCount()
 	for row := 0; row < rowCount; row++ {
 		cell, err := t.GetCell(row, colIndex)
 		if err != nil {
 			return fmt.Errorf("获取单元格失败 (行:%d, 列:%d): %v", row, colIndex, err)
 		}
-
+		
 		text, _ := t.GetCellText(row, colIndex)
-
+		
 		if err := fn(row, cell, text); err != nil {
 			return fmt.Errorf("回调函数执行失败 (行:%d, 列:%d): %v", row, colIndex, err)
 		}
 	}
-
+	
 	return nil
 }
 
@@ -2502,22 +2506,22 @@ func (t *Table) GetCellRange(startRow, startCol, endRow, endCol int) ([]*CellInf
 	if startRow < 0 || startCol < 0 || endRow >= t.GetRowCount() || endCol >= t.GetColumnCount() {
 		return nil, fmt.Errorf("范围索引无效: (%d,%d) 到 (%d,%d)", startRow, startCol, endRow, endCol)
 	}
-
+	
 	if startRow > endRow || startCol > endCol {
 		return nil, fmt.Errorf("开始位置不能大于结束位置")
 	}
-
+	
 	var cells []*CellInfo
-
+	
 	for row := startRow; row <= endRow; row++ {
 		for col := startCol; col <= endCol; col++ {
 			cell, err := t.GetCell(row, col)
 			if err != nil {
 				return nil, fmt.Errorf("获取单元格失败 (行:%d, 列:%d): %v", row, col, err)
 			}
-
+			
 			text, _ := t.GetCellText(row, col)
-
+			
 			cellInfo := &CellInfo{
 				Row:    row,
 				Col:    col,
@@ -2525,18 +2529,18 @@ func (t *Table) GetCellRange(startRow, startCol, endRow, endCol int) ([]*CellInf
 				Text:   text,
 				IsLast: row == endRow && col == endCol,
 			}
-
+			
 			cells = append(cells, cellInfo)
 		}
 	}
-
+	
 	return cells, nil
 }
 
 // FindCells 查找满足条件的单元格
 func (t *Table) FindCells(predicate func(row, col int, cell *TableCell, text string) bool) ([]*CellInfo, error) {
 	var matchedCells []*CellInfo
-
+	
 	err := t.ForEach(func(row, col int, cell *TableCell, text string) error {
 		if predicate(row, col, cell, text) {
 			cellInfo := &CellInfo{
@@ -2549,11 +2553,11 @@ func (t *Table) FindCells(predicate func(row, col int, cell *TableCell, text str
 		}
 		return nil
 	})
-
+	
 	if err != nil {
 		return nil, err
 	}
-
+	
 	return matchedCells, nil
 }
 
