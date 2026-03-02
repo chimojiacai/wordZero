@@ -392,3 +392,14 @@ func reportExplain(doc *Document, textFormat *TextFormat, spacingConfig *Spacing
 	content.SetAlignment(AlignLeft)
 	content.SetSpacing(spacingConfig)
 }
+
+func TestOpenWordEdit(t *testing.T) {
+	doc, err := Open("test_open_word.docx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tables := doc.Body.GetTables()
+	table := tables[1]
+	table.SetCellText(8, 1, "testword")
+	doc.Save("test_open_word2.docx")
+}

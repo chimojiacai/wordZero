@@ -650,6 +650,31 @@ func Open(filename string) (*Document, error) {
 		Debugf("已读取文件部件: %s (%d 字节)", file.Name, len(data))
 	}
 	
+	// 解析内容类型和关系文件，保留原有配置
+	if contentTypesData, ok := doc.parts["[Content_Types].xml"]; ok {
+		var ct ContentTypes
+		if err := xml.Unmarshal(contentTypesData, &ct); err == nil {
+			doc.contentTypes = &ct
+			Debugf("已解析内容类型")
+		}
+	}
+	
+	if relsData, ok := doc.parts["_rels/.rels"]; ok {
+		var rels Relationships
+		if err := xml.Unmarshal(relsData, &rels); err == nil {
+			doc.relationships = &rels
+			Debugf("已解析主关系文件")
+		}
+	}
+	
+	if docRelsData, ok := doc.parts["word/_rels/document.xml.rels"]; ok {
+		var docRels Relationships
+		if err := xml.Unmarshal(docRelsData, &docRels); err == nil {
+			doc.documentRelationships = &docRels
+			Debugf("已解析文档关系文件")
+		}
+	}
+	
 	// 初始化样式管理器
 	doc.styleManager = style.NewStyleManager()
 	
