@@ -2571,3 +2571,225 @@ func (t *Table) FindCellsByText(searchText string, exactMatch bool) ([]*CellInfo
 		return strings.Contains(text, searchText)
 	})
 }
+
+// SetCellImage 向表格单元格中添加图片
+//
+// 参数:
+//   - row: 行索引（从0开始）
+//   - col: 列索引（从0开始）
+//   - imageInfo: 图片信息（通过 doc.AddImageFromFile 或 doc.AddImageFromData 获取）
+//
+// 使用示例:
+//
+//	// 1. 先添加图片到文档（不创建段落）
+//	imageInfo, err := doc.AddImageFromDataWithoutElement(
+//	    imageData,
+//	    "image.png",
+//	    document.ImageFormatPNG,
+//	    width,
+//	    height,
+//	    &document.ImageConfig{
+//	        Size: &document.ImageSize{
+//	            Width:  50,  // 宽度50毫米
+//	            Height: 30,  // 高度30毫米
+//	        },
+//	    },
+//	)
+//	if err != nil {
+//	    return err
+//	}
+//
+//	// 2. 将图片添加到表格单元格
+//	err = table.SetCellImage(0, 0, imageInfo)
+//
+// 注意: 此方法会清空单元格原有的文本内容，只保留图片
+func (t *Table) SetCellImage(row, col int, imageInfo *ImageInfo) error {
+	cell, err := t.GetCell(row, col)
+	if err != nil {
+		return err
+	}
+
+	// 创建包含图片的段落
+	paragraph := t.createImageParagraphInCell(imageInfo)
+
+	// 替换单元格的段落
+	cell.Paragraphs = []Paragraph{*paragraph}
+
+	Info(fmt.Sprintf("设置单元格(%d,%d)图片成功", row, col))
+	return nil
+}
+
+// AddCellImage 向表格单元格中追加图片（保留原有内容）
+//
+// 参数:
+//   - row: 行索引（从0开始）
+//   - col: 列索引（从0开始）
+//   - imageInfo: 图片信息（通过 doc.AddImageFromFile 或 doc.AddImageFromData 获取）
+//
+// 使用示例:
+//
+//	// 1. 先添加图片到文档
+//	imageInfo, err := doc.AddImageFromDataWithoutElement(...)
+//
+//	// 2. 向单元格追加图片（单元格中原有文本会保留）
+//	err = table.AddCellImage(0, 0, imageInfo)
+func (t *Table) AddCellImage(row, col int, imageInfo *ImageInfo) error {
+	cell, err := t.GetCell(row, col)
+	if err != nil {
+		return err
+	}
+
+	// 创建包含图片的段落
+	paragraph := t.createImageParagraphInCell(imageInfo)
+
+	// 追加到单元格的段落列表
+	cell.Paragraphs = append(cell.Paragraphs, *paragraph)
+
+	Info(fmt.Sprintf("向单元格(%d,%d)追加图片成功", row, col))
+	return nil
+}
+
+// createImageParagraphInCell 创建包含图片的段落（用于表格单元格）
+func (t *Table) createImageParagraphInCell(imageInfo *ImageInfo) *Paragraph {
+	// 计算图片显示尺寸（EMU单位）
+	displayWidth, displayHeight := calculateCellImageDisplaySize(imageInfo)
+
+	// 获取图片描述和标题
+	altText := "图片"
+	title := "图片"
+	if imageInfo.Config != nil {
+		if imageInfo.Config.AltText != "" {
+			altText = imageInfo.Config.AltText
+		}
+		if imageInfo.Config.Title != "" {
+			title = imageInfo.Config.Title
+		}
+	}
+
+	// 创建Drawing元素（只支持嵌入式图片）
+	drawing := createInlineImageDrawingForCell(imageInfo, displayWidth, displayHeight, altText, title)
+
+	// 创建包含图片的段落
+	paragraph := &Paragraph{
+		Runs: []Run{
+			{
+				Drawing: drawing,
+			},
+		},
+	}
+
+	// 为嵌入式图片设置段落对齐方式
+	if imageInfo.Config != nil &&
+		imageInfo.Config.Alignment != "" {
+		paragraph.Properties = &ParagraphProperties{
+			Justification: &Justification{Val: string(imageInfo.Config.Alignment)},
+		}
+	}
+
+	return paragraph
+}
+
+// createInlineImageDrawingForCell 创建嵌入式图片绘图元素（用于表格单元格）
+func createInlineImageDrawingForCell(imageInfo *ImageInfo, displayWidth, displayHeight int64, altText, title string) *DrawingElement {
+	return &DrawingElement{
+		Inline: &InlineDrawing{
+			DistT: "0",
+			DistB: "0",
+			DistL: "0",
+			DistR: "0",
+			Extent: &DrawingExtent{
+				Cx: fmt.Sprintf("%d", displayWidth),
+				Cy: fmt.Sprintf("%d", displayHeight),
+			},
+			DocPr: &DrawingDocPr{
+				ID:    imageInfo.ID,
+				Name:  fmt.Sprintf("图片 %s", imageInfo.ID),
+				Descr: altText,
+				Title: title,
+			},
+			Graphic: createImageGraphicForCell(imageInfo, displayWidth, displayHeight, altText, title),
+		},
+	}
+}
+
+// createImageGraphicForCell 创建图片图形元素（用于表格单元格）
+func createImageGraphicForCell(imageInfo *ImageInfo, displayWidth, displayHeight int64, altText, title string) *DrawingGraphic {
+	return &DrawingGraphic{
+		Xmlns: "http://schemas.openxmlformats.org/drawingml/2006/main",
+		GraphicData: &GraphicData{
+			Uri: "http://schemas.openxmlformats.org/drawingml/2006/picture",
+			Pic: &PicElement{
+				Xmlns: "http://schemas.openxmlformats.org/drawingml/2006/picture",
+				NvPicPr: &NvPicPr{
+					CNvPr: &CNvPr{
+						ID:    imageInfo.ID,
+						Name:  fmt.Sprintf("图片 %s", imageInfo.ID),
+						Descr: altText,
+						Title: title,
+					},
+					CNvPicPr: &CNvPicPr{
+						PicLocks: &PicLocks{
+							NoChangeAspect: "1",
+						},
+					},
+				},
+				BlipFill: &BlipFill{
+					Blip: &Blip{
+						Embed: imageInfo.RelationID,
+					},
+					Stretch: &Stretch{
+						FillRect: &FillRect{},
+					},
+				},
+				SpPr: &SpPr{
+					Xfrm: &Xfrm{
+						Off: &Off{
+							X: "0",
+							Y: "0",
+						},
+						Ext: &Ext{
+							Cx: fmt.Sprintf("%d", displayWidth),
+							Cy: fmt.Sprintf("%d", displayHeight),
+						},
+					},
+					PrstGeom: &PrstGeom{
+						Prst:  "rect",
+						AvLst: &AvLst{},
+					},
+				},
+			},
+		},
+	}
+}
+
+// calculateCellImageDisplaySize 计算单元格中图片的显示尺寸（EMU单位）
+func calculateCellImageDisplaySize(imageInfo *ImageInfo) (int64, int64) {
+	config := imageInfo.Config
+	originalWidth := int64(imageInfo.Width)
+	originalHeight := int64(imageInfo.Height)
+
+	// 默认使用原始尺寸（96 DPI）
+	// 1像素 = 9525 EMU (at 96 DPI)
+	displayWidth := originalWidth * 9525
+	displayHeight := originalHeight * 9525
+
+	if config != nil && config.Size != nil {
+		if config.Size.Width > 0 && config.Size.Height > 0 {
+			// 用户指定了具体尺寸
+			displayWidth = int64(config.Size.Width * 36000)   // 毫米转EMU
+			displayHeight = int64(config.Size.Height * 36000) // 毫米转EMU
+		} else if config.Size.Width > 0 && config.Size.KeepAspectRatio {
+			// 只指定宽度，保持长宽比
+			displayWidth = int64(config.Size.Width * 36000)
+			ratio := float64(originalHeight) / float64(originalWidth)
+			displayHeight = int64(float64(displayWidth) * ratio)
+		} else if config.Size.Height > 0 && config.Size.KeepAspectRatio {
+			// 只指定高度，保持长宽比
+			displayHeight = int64(config.Size.Height * 36000)
+			ratio := float64(originalWidth) / float64(originalHeight)
+			displayWidth = int64(float64(displayHeight) * ratio)
+		}
+	}
+
+	return displayWidth, displayHeight
+}

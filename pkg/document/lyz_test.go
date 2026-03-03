@@ -7,6 +7,7 @@ package document
 
 import (
 	"fmt"
+	"log"
 	"testing"
 	"time"
 	
@@ -147,6 +148,22 @@ func TestHeaderStyle(t *testing.T) {
 	tableBz.MergeCellsVertical(9, 10, 0)
 	tableBz.MergeCellsVertical(12, 13, 0)
 	tableBz.MergeCellsVertical(14, 15, 0)
+	// 创建图片配置
+	imageConfig := &ImageConfig{
+		Size: &ImageSize{
+			Width:           40, // 宽度40毫米
+			Height:          20, // 高度30毫米
+			KeepAspectRatio: true,
+		},
+		Alignment: AlignCenter,
+	}
+	// 注意：你需要准备一个真实的图片文件
+	imageInfo1, err := doc.AddImageFromFile("img.png", imageConfig)
+	if err != nil {
+		log.Printf("添加图片1失败: %v", err)
+	} else {
+		tableBz.SetCellImage(1, 2, imageInfo1)
+	}
 	
 	tableBz.SetCellText(0, 0, "适用范围")
 	tableBz.SetCellText(0, 1, "文件名")
