@@ -103,11 +103,12 @@ type TableCellProperties struct {
 	GridSpan      *GridSpan             `xml:"w:gridSpan,omitempty"`
 	VMerge        *VMerge               `xml:"w:vMerge,omitempty"`
 	TextDirection *TextDirection        `xml:"w:textDirection,omitempty"`
-	Shd           *TableCellShading     `xml:"w:shd,omitempty"`       // 单元格背景
-	TcBorders     *TableCellBorders     `xml:"w:tcBorders,omitempty"` // 单元格边框
-	TcMar         *TableCellMarginsCell `xml:"w:tcMar,omitempty"`     // 单元格边距
-	NoWrap        *NoWrap               `xml:"w:noWrap,omitempty"`    // 禁止换行
-	HideMark      *HideMark             `xml:"w:hideMark,omitempty"`  // 隐藏标记
+	Shd           *TableCellShading     `xml:"w:shd,omitempty"`        // 单元格背景
+	TcBorders     *TableCellBorders     `xml:"w:tcBorders,omitempty"`  // 单元格边框
+	TcMar         *TableCellMarginsCell `xml:"w:tcMar,omitempty"`      // 单元格边距
+	NoWrap        *NoWrap               `xml:"w:noWrap,omitempty"`     // 禁止换行
+	HideMark      *HideMark             `xml:"w:hideMark,omitempty"`    // 隐藏标记
+	Placeholder   *SDTPlaceholder       `xml:"w:placeholder,omitempty"` // 单元格占位符
 }
 
 // TableCellMarginsCell 单元格边距（与表格边距不同的XML结构）
@@ -2792,4 +2793,200 @@ func calculateCellImageDisplaySize(imageInfo *ImageInfo) (int64, int64) {
 	}
 
 	return displayWidth, displayHeight
+}
+
+// ============== 表格单元格占位符功能 ==============
+
+// SetCellPlaceholder 设置单元格占位符
+//
+// 参数:
+//   - row: 行索引（从0开始）
+//   - col: 列索引（从0开始）
+//   - placeholderText: 占位符文本，通常用于标识该单元格的用途
+//
+// 使用示例:
+//
+//	err := table.SetCellPlaceholder(0, 0, "请输入姓名")
+func (t *Table) SetCellPlaceholder(row, col int, placeholderText string) error {
+	cell, err := t.GetCell(row, col)
+	if err != nil {
+		return err
+	}
+
+	// 确保单元格有属性
+	if cell.Properties == nil {
+		cell.Properties = &TableCellProperties{}
+	}
+
+	// 设置占位符
+	cell.Properties.Placeholder = &SDTPlaceholder{
+		DocPart: &DocPart{
+			Val: placeholderText,
+		},
+	}
+
+	Info(fmt.Sprintf("设置单元格(%d,%d)占位符成功: %s", row, col, placeholderText))
+	return nil
+}
+
+// GetCellPlaceholder 获取单元格占位符文本
+//
+// 参数:
+//   - row: 行索引（从0开始）
+//   - col: 列索引（从0开始）
+//
+// 返回值:
+//   - 占位符文本，如果没有设置则返回空字符串
+//   - 错误信息
+//
+// 使用示例:
+//
+//	placeholder, err := table.GetCellPlaceholder(0, 0)
+//	if err != nil {
+//	    return err
+//	}
+//	fmt.Println("占位符:", placeholder)
+func (t *Table) GetCellPlaceholder(row, col int) (string, error) {
+	cell, err := t.GetCell(row, col)
+	if err != nil {
+		return "", err
+	}
+
+	if cell.Properties == nil || cell.Properties.Placeholder == nil {
+		return "", nil
+	}
+
+	if cell.Properties.Placeholder.DocPart != nil {
+		return cell.Properties.Placeholder.DocPart.Val, nil
+	}
+
+	return "", nil
+}
+
+// RemoveCellPlaceholder 移除单元格占位符
+//
+// 参数:
+//   - row: 行索引（从0开始）
+//   - col: 列索引（从0开始）
+//
+// 使用示例:
+//
+//	err := table.RemoveCellPlaceholder(0, 0)
+func (t *Table) RemoveCellPlaceholder(row, col int) error {
+	cell, err := t.GetCell(row, col)
+	if err != nil {
+		return err
+	}
+
+	if cell.Properties != nil {
+		cell.Properties.Placeholder = nil
+	}
+
+	Info(fmt.Sprintf("移除单元格(%d,%d)占位符成功", row, col))
+	return nil
+}
+
+// HasCellPlaceholder 检查单元格是否设置了占位符
+//
+// 参数:
+//   - row: 行索引（从0开始）
+//   - col: 列索引（从0开始）
+//
+// 返回值:
+//   - 是否有占位符
+//   - 错误信息
+//
+// 使用示例:
+//
+//	hasPlaceholder, err := table.HasCellPlaceholder(0, 0)
+//	if err != nil {
+//	    return err
+//	}
+//	if hasPlaceholder {
+//	    fmt.Println("该单元格有占位符")
+//	}
+func (t *Table) HasCellPlaceholder(row, col int) (bool, error) {
+	cell, err := t.GetCell(row, col)
+	if err != nil {
+		return false, err
+	}
+
+	if cell.Properties == nil || cell.Properties.Placeholder == nil {
+		return false, nil
+	}
+
+	if cell.Properties.Placeholder.DocPart != nil && cell.Properties.Placeholder.DocPart.Val != "" {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+// SetCellPlaceholderRange 批量设置单元格区域占位符
+//
+// 参数:
+//   - startRow: 起始行索引（从0开始）
+//   - startCol: 起始列索引（从0开始）
+//   - endRow: 结束行索引（从0开始）
+//   - endCol: 结束列索引（从0开始）
+//   - placeholderText: 占位符文本
+//
+// 使用示例:
+//
+//	err := table.SetCellPlaceholderRange(0, 0, 2, 3, "请输入数据")
+func (t *Table) SetCellPlaceholderRange(startRow, startCol, endRow, endCol int, placeholderText string) error {
+	// 参数验证
+	if startRow < 0 || startCol < 0 || endRow >= t.GetRowCount() || endCol >= t.GetColumnCount() {
+		return fmt.Errorf("范围索引无效: (%d,%d) 到 (%d,%d)", startRow, startCol, endRow, endCol)
+	}
+
+	if startRow > endRow || startCol > endCol {
+		return fmt.Errorf("开始位置不能大于结束位置")
+	}
+
+	for row := startRow; row <= endRow; row++ {
+		for col := startCol; col <= endCol; col++ {
+			err := t.SetCellPlaceholder(row, col, placeholderText)
+			if err != nil {
+				return fmt.Errorf("设置单元格(%d,%d)占位符失败: %v", row, col, err)
+			}
+		}
+	}
+
+	Info(fmt.Sprintf("批量设置单元格区域占位符成功: (%d,%d) 到 (%d,%d)", startRow, startCol, endRow, endCol))
+	return nil
+}
+
+// RemoveCellPlaceholderRange 批量移除单元格区域占位符
+//
+// 参数:
+//   - startRow: 起始行索引（从0开始）
+//   - startCol: 起始列索引（从0开始）
+//   - endRow: 结束行索引（从0开始）
+//   - endCol: 结束列索引（从0开始）
+//
+// 使用示例:
+//
+//	err := table.RemoveCellPlaceholderRange(0, 0, 2, 3)
+func (t *Table) RemoveCellPlaceholderRange(startRow, startCol, endRow, endCol int) error {
+	// 参数验证
+	if startRow < 0 || startCol < 0 || endRow >= t.GetRowCount() || endCol >= t.GetColumnCount() {
+		return fmt.Errorf("范围索引无效: (%d,%d) 到 (%d,%d)", startRow, startCol, endRow, endCol)
+	}
+
+	if startRow > endRow || startCol > endCol {
+		return fmt.Errorf("开始位置不能大于结束位置")
+	}
+
+	for row := startRow; row <= endRow; row++ {
+		for col := startCol; col <= endCol; col++ {
+			err := t.RemoveCellPlaceholder(row, col)
+			if err != nil {
+				return fmt.Errorf("移除单元格(%d,%d)占位符失败: %v", row, col, err)
+			}
+		}
+	}
+
+	Info(fmt.Sprintf("批量移除单元格区域占位符成功: (%d,%d) 到 (%d,%d)", startRow, startCol, endRow, endCol))
+	return nil
 }

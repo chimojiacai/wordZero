@@ -8,6 +8,7 @@ package document
 import (
 	"fmt"
 	"log"
+	"os"
 	"testing"
 	"time"
 	
@@ -157,15 +158,29 @@ func TestHeaderStyle(t *testing.T) {
 		},
 		Alignment: AlignCenter,
 	}
-	// 注意：你需要准备一个真实的图片文件
-	imageInfo1, err := doc.AddImageFromFile("img.png", imageConfig)
+	/// 读取文件
+	data, err := os.ReadFile("img.png")
+	if err != nil {
+		log.Fatal(err)
+	}
+	imageInfo2, err := doc.AddImageFromDataWithoutElement(
+		data,
+		"img.png",
+		ImageFormatPNG,
+		200, // 原始宽度
+		150, // 原始高度
+		imageConfig,
+	)
+	//注意：你需要准备一个真实的图片文件/
+	//imageInfo1, err := doc.AddImageFromDataWithoutElement("img.png", imageConfig)
+	
 	if err != nil {
 		log.Printf("添加图片1失败: %v", err)
 	} else {
-		tableBz.SetCellImage(1, 2, imageInfo1)
+		tableBz.SetCellImage(1, 2, imageInfo2)
 	}
-	
-	tableBz.SetCellText(0, 0, "适用范围")
+	tableBz.SetCellPlaceholder(0, 0, "此为表格单元格占位符")
+	//tableBz.SetCellText(0, 0, "适用范围")
 	tableBz.SetCellText(0, 1, "文件名")
 	tableBz.SetCellText(0, 2, "文件编号")
 	tableBz.SetCellText(1, 0, "生态环境部")
